@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="{{ theme if theme else 'dark' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ title }}{% endblock %}</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Chart.js for visualizations -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Alpine.js for reactive components -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/styles.css') }}">
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#eff6ff',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            900: '#1e3a8a'
+                        },
+                        dark: {
+                            800: '#1f2937',
+                            900: '#111827'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+    {% if user %}
+    <!-- Navigation -->
+    <nav class="bg-white dark:bg-gray-800 shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <!-- Logo -->
+                    <div class="flex-shrink-0 flex items-center">
+                        <i class="fas fa-stream text-primary-500 text-2xl mr-2"></i>
+                        <span class="text-xl font-bold">StreamFlow</span>
+                    </div>
+                    
+                    <!-- Navigation Links -->
+                    <div class="hidden md:ml-6 md:flex md:space-x-8">
+                        <a href="/" class="nav-link">
+                            <i class="fas fa-tachometer-alt mr-2"></i>Dashboard
+                        </a>
+                        <a href="/events" class="nav-link">
+                            <i class="fas fa-bolt mr-2"></i>Events
+                        </a>
+                        <a href="/metrics" class="nav-link">
+                            <i class="fas fa-chart-line mr-2"></i>Metrics
+                        </a>
+                        <a href="/alerts" class="nav-link">
+                            <i class="fas fa-exclamation-triangle mr-2"></i>Alerts
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <!-- Real-time status -->
+                    <div id="connectionStatus" class="flex items-center">
+                        <div class="w-3 h-3 bg-green-500 rounded-full animate-pulse mr-2"></div>
+                        <span class="text-sm">Connected</span>
+                    </div>
+                    
+                    <!-- Theme toggle -->
+                    <button id="themeToggle" class="p-2 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700">
+                        <i class="fas fa-moon dark:hidden"></i>
+                        <i class="fas fa-sun hidden dark:inline"></i>
+                    </button>
+                    
+                    <!-- User dropdown -->
+                    <div class="relative" x-data="{ open: false }">
+                        <button @click="open = !open" class="flex items-center space-x-2 text-sm rounded-full focus:outline-none">
+                            <img class="h-8 w-8 rounded-full bg-primary-500" src="https://ui-avatars.com/api/?name={{ user.full_name }}&background=3b82f6&color=fff" alt="{{ user.full_name }}">
+                            <span class="hidden md:block">{{ user.full_name }}</span>
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                        
+                        <div x-show="open" @click.outside="open = false" x-transition class="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg py-1 z-50">
+                            <a href="/settings" class="block px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700">
+                                <i class="fas fa-cog mr-2"></i>Settings
+                            </a>
+                            <a href="/api/v1/auth/logout" class="block px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700">
+                                <i class="fas fa-sign-out-alt mr-2"></i>Logout
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+    {% endif %}
+
+    <!-- Main Content -->
+    <main class="{% if user %}max-w-7xl mx-auto py-6 sm:px-6 lg:px-8{% else %}min-h-screen flex items-center justify-center{% endif %}">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- WebSocket Connection -->
+    <script>
+        let ws = null;
+        let reconnectInterval = null;
+        
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws/dashboard`;
+            
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = function() {
+                console.log('WebSocket connected');
+                updateConnectionStatus(true);
+                clearInterval(reconnectInterval);
+            };
+            
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                handleWebSocketMessage(data);
+            };
+            
+            ws.onclose = function() {
+                console.log('WebSocket disconnected');
+                updateConnectionStatus(false);
+                reconnectInterval = setInterval(connectWebSocket, 5000);
+            };
+            
+            ws.onerror = function(error) {
+                console.error('WebSocket error:', error);
+                updateConnectionStatus(false);
+            };
+        }
+        
+        function updateConnectionStatus(connected) {
+            const statusEl = document.getElementById('connectionStatus');
+            if (statusEl) {
+                const dot = statusEl.querySelector('div');
+                const text = statusEl.querySelector('span');
+                
+                if (connected) {
+                    dot.className = 'w-3 h-3 bg-green-500 rounded-full animate-pulse mr-2';
+                    text.textContent = 'Connected';
+                } else {
+                    dot.className = 'w-3 h-3 bg-red-500 rounded-full mr-2';
+                    text.textContent = 'Disconnected';
+                }
+            }
+        }
+        
+        function handleWebSocketMessage(data) {
+            // Handle different message types
+            switch(data.type) {
+                case 'metric_update':
+                    updateMetricWidget(data.payload);
+                    break;
+                case 'alert_triggered':
+                    showAlertNotification(data.payload);
+                    break;
+                case 'event_count':
+                    updateEventCounter(data.payload);
+                    break;
+            }
+        }
+        
+        // Initialize WebSocket connection if user is logged in
+        {% if user %}
+        document.addEventListener('DOMContentLoaded', function() {
+            connectWebSocket();
+        });
+        {% endif %}
+        
+        // Theme toggle functionality
+        document.getElementById('themeToggle')?.addEventListener('click', function() {
+            const html = document.documentElement;
+            const isDark = html.classList.contains('dark');
+            
+            if (isDark) {
+                html.classList.remove('dark');
+                localStorage.setItem('theme', 'light');
+            } else {
+                html.classList.add('dark');
+                localStorage.setItem('theme', 'dark');
+            }
+        });
+        
+        // Apply saved theme
+        const savedTheme = localStorage.getItem('theme') || '{{ theme }}';
+        if (savedTheme === 'dark') {
+            document.documentElement.classList.add('dark');
+        }
+    </script>
+    
+    <!-- Custom JavaScript -->
+    <script src="{{ url_for('static', path='/js/app.js') }}"></script>
+    
+    {% block scripts %}{% endblock %}
+</body>
+</html>
