@@ -1,7 +1,5 @@
 # StreamFlow Usage Examples
 
-Based on the StreamFlow library documentation, here are comprehensive examples of how users can utilize this real-time analytics pipeline.
-
 ## Installation and Setup
 
 ```bash
