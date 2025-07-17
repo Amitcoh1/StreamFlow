@@ -1,0 +1,20 @@
+include README.md
+include LICENSE
+include requirements.txt
+include .env.example
+include pytest.ini
+include pyproject.toml
+recursive-include streamflow *.py
+recursive-include streamflow/shared *.py
+recursive-include streamflow/services *.py
+recursive-include streamflow/docker *
+recursive-include streamflow/docs *.md
+recursive-include streamflow/examples *.py
+recursive-include streamflow/scripts *.sh
+recursive-include streamflow/tests *.py
+recursive-include streamflow/k8s *.yaml
+recursive-include streamflow/helm *.yaml
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]
+recursive-exclude * .DS_Store
+recursive-exclude * *.log

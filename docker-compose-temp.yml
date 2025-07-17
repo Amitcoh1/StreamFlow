@@ -1,0 +1,67 @@
+# Temporary Docker Compose for StreamFlow with fixed volume paths
+version: '3.8'
+
+services:
+  # Infrastructure Services
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: streamflow-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=admin
+      - RABBITMQ_DEFAULT_PASS=admin123
+      - RABBITMQ_DEFAULT_VHOST=/
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - streamflow-network
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  postgres:
+    image: postgres:15
+    container_name: streamflow-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=streamflow
+      - POSTGRES_USER=streamflow
+      - POSTGRES_PASSWORD=streamflow123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - streamflow-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U streamflow"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    container_name: streamflow-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - streamflow-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  rabbitmq_data:
+  postgres_data:
+  redis_data:
+
+networks:
+  streamflow-network:
+    driver: bridge 
