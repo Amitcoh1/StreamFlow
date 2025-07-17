@@ -29,8 +29,8 @@ A real-time analytics pipeline built with Python, FastAPI, and RabbitMQ.
 │  (REST/WS)      │    │   (FastAPI)     │    │  Topic Exchange │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
                                                         │
-                        ┌─────────────────┐            │
-                        │   Analytics     │◀───────────┘
+                        ┌─────────────────┐             │
+                        │   Analytics     │◀───────────-┘
                         │   Pipeline      │
                         └─────────────────┘
                                  │
@@ -265,10 +265,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Support
 
-- [GitHub Issues](https://github.com/amitcohen/streamflow/issues)
-- [Discord Community](https://discord.gg/streamflow)
-- [Email Support](mailto:amit.cohen@streamflow.dev)
+- [GitHub Issues](https://github.com/AmitCoh1/streamFlow/issues)
+- [Email Support](mailto:amitcoh1@gmail.com)
 
 ---
 
-**Created by Amit Cohen** - [GitHub](https://github.com/amitcohen) | [LinkedIn](https://linkedin.com/in/amitcohen) | [Email](mailto:amit.cohen@streamflow.dev)
+**Created by Amit Cohen** - [GitHub](https://github.com/AmitCoh1) | [LinkedIn]([https://linkedin.com/in/amitcoh1](https://www.linkedin.com/in/amitcohen1301/)) | [Email](mailto:amitcoh1@gmail.com)
