@@ -18,6 +18,7 @@ from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 import uvicorn
 import json
+import httpx
 from prometheus_client import Counter, Histogram, generate_latest
 from prometheus_client.openmetrics.exposition import CONTENT_TYPE_LATEST
 
@@ -531,6 +532,94 @@ async def delete_dashboard(
     except Exception as e:
         logger.error(f"Failed to delete dashboard: {e}")
         raise HTTPException(status_code=500, detail="Failed to delete dashboard")
+
+
+# Events endpoints
+@app.get("/api/v1/events")
+async def get_events(
+    limit: int = Query(default=50, ge=1, le=1000),
+    offset: int = Query(default=0, ge=0),
+    event_type: Optional[str] = Query(default=None),
+    user=Depends(authenticate_user)
+):
+    """Get recent events from storage service"""
+    
+    try:
+        # Query storage service for events
+        storage_url = f"http://storage:8005/api/v1/events/query"
+        query_data = {
+            "limit": limit,
+            "offset": offset
+        }
+        
+        if event_type:
+            # Convert string to EventType enum format
+            query_data["event_types"] = [event_type]
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.post(storage_url, json=query_data, timeout=10)
+            response.raise_for_status()
+            events = response.json()
+        
+        return APIResponse(
+            success=True,
+            message="Events retrieved successfully",
+            data=events
+        )
+    except httpx.RequestError as e:
+        logger.error(f"Failed to connect to storage service: {e}")
+        # Return empty list if storage service is unavailable
+        return APIResponse(
+            success=True,
+            message="Storage service unavailable, returning empty list",
+            data=[]
+        )
+    except Exception as e:
+        logger.error(f"Failed to get events: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get events")
+
+
+@app.get("/api/v1/stats")
+async def get_dashboard_stats(user=Depends(authenticate_user)):
+    """Get dashboard statistics including real events count"""
+    
+    try:
+        # Get storage stats from storage service
+        storage_stats = {}
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get("http://storage:8005/api/v1/stats", timeout=10)
+                response.raise_for_status()
+                storage_stats = response.json()
+        except Exception as e:
+            logger.warning(f"Could not get storage stats: {e}")
+            storage_stats = {
+                "total_events": 0,
+                "events_by_type": {},
+                "events_by_source": {}
+            }
+        
+        # Get current metrics
+        current_metrics = metrics_manager.get_current_metrics()
+        
+        # Combine stats
+        dashboard_stats = {
+            "total_events": storage_stats.get("total_events", 0),
+            "events_by_type": storage_stats.get("events_by_type", {}),
+            "events_by_source": storage_stats.get("events_by_source", {}),
+            "real_time_metrics": current_metrics,
+            "active_connections": len(metrics_manager.websocket_connections),
+            "storage_health": "connected" if storage_stats else "disconnected"
+        }
+        
+        return APIResponse(
+            success=True,
+            message="Dashboard stats retrieved successfully",
+            data=dashboard_stats
+        )
+    except Exception as e:
+        logger.error(f"Failed to get dashboard stats: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get dashboard stats")
 
 
 # WebSocket endpoints

@@ -39,24 +39,37 @@ const Dashboard = () => {
       setError(null);
 
       // Fetch real metrics from APIs
-      const [statsRes] = await Promise.all([
-        axios.get('/api/v1/stats').catch(() => ({ data: { total_events: 0 } })),
-      ]);
+      const response = await axios.get('/api/v1/stats');
       
-      setMetrics({
-        totalEvents: statsRes.data.total_events || 0,
-        eventsPerSecond: Math.floor(Math.random() * 50) + 10, // Real-time simulation
-        activeConnections: Math.floor(Math.random() * 20) + 5,
-        alertsToday: 12,
-      });
+      if (response.data.success) {
+        const data = response.data.data;
+        
+        setMetrics({
+          totalEvents: data.total_events || 0,
+          eventsPerSecond: data.real_time_metrics?.events_per_second || 0,
+          activeConnections: data.active_connections || 0,
+          alertsToday: data.real_time_metrics?.active_alerts || 0,
+        });
 
-      // Use sample data for now - in production these would come from real endpoints
-      setEventData(sampleEventData);
-      setAlertData(sampleAlertData);
+        // Convert events by type to chart data for alerts
+        const eventsByType = data.events_by_type || {};
+        const alertChartData = Object.entries(eventsByType).map(([type, count]) => ({
+          type: type.replace(/[._]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+          count: count
+        }));
+        
+        setAlertData(alertChartData.length > 0 ? alertChartData : sampleAlertData);
+        
+        // Use sample event data for now (could be enhanced with real time-series data)
+        setEventData(sampleEventData);
+        
+      } else {
+        throw new Error('API returned error response');
+      }
 
     } catch (error) {
       console.error('Error fetching metrics:', error);
-      setError('Failed to fetch metrics');
+      setError('Failed to fetch metrics. Using sample data.');
       
       // Fallback to sample data
       setMetrics({

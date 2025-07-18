@@ -1,49 +1,57 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Download } from 'lucide-react';
+import { Search, Download, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
+import axios from 'axios';
 
 const Events = () => {
   const [events, setEvents] = useState([]);
   const [filteredEvents, setFilteredEvents] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState('all');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Sample events data
-  const getSampleEvents = useCallback(() => [
-    {
-      id: '1',
-      type: 'WEB_CLICK',
-      source: 'web-app',
-      timestamp: new Date(Date.now() - 1000 * 60 * 5),
-      severity: 'INFO',
-      data: { user_id: 'user123', button: 'submit' },
-      user_id: 'user123'
-    },
-    {
-      id: '2',
-      type: 'API_REQUEST',
-      source: 'mobile-app',
-      timestamp: new Date(Date.now() - 1000 * 60 * 10),
-      severity: 'INFO',
-      data: { endpoint: '/api/users', method: 'GET' },
-      user_id: 'user456'
-    },
-    {
-      id: '3',
-      type: 'ERROR',
-      source: 'backend',
-      timestamp: new Date(Date.now() - 1000 * 60 * 15),
-      severity: 'ERROR',
-      data: { error_code: 500, message: 'Database timeout' },
-      user_id: null
+  // Fetch events from API
+  const fetchEvents = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await axios.get('/api/v1/events?limit=100');
+      
+      if (response.data.success) {
+        const eventsData = response.data.data || [];
+        // Convert timestamp strings to Date objects and normalize field names
+        const normalizedEvents = eventsData.map(event => ({
+          ...event,
+          timestamp: new Date(event.timestamp),
+          type: event.type.toUpperCase(),
+          severity: event.severity.toUpperCase()
+        }));
+        
+        setEvents(normalizedEvents);
+        setFilteredEvents(normalizedEvents);
+      } else {
+        throw new Error('Failed to fetch events');
+      }
+    } catch (error) {
+      console.error('Error fetching events:', error);
+      setError('Failed to load events. Please try again.');
+      
+      // Fallback to empty array
+      setEvents([]);
+      setFilteredEvents([]);
+    } finally {
+      setLoading(false);
     }
-  ], []);
+  }, []);
 
   useEffect(() => {
-    const sampleEvents = getSampleEvents();
-    setEvents(sampleEvents);
-    setFilteredEvents(sampleEvents);
-  }, [getSampleEvents]);
+    fetchEvents();
+    // Auto-refresh every 10 seconds
+    const interval = setInterval(fetchEvents, 10000);
+    return () => clearInterval(interval);
+  }, [fetchEvents]);
 
   useEffect(() => {
     let filtered = events;
@@ -84,10 +92,27 @@ const Events = () => {
   return (
     <div className="p-6">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Events</h1>
-        <p className="text-gray-600">Real-time event stream and history</p>
+      <div className="mb-8 flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Events</h1>
+          <p className="text-gray-600">Real-time event stream and history</p>
+        </div>
+        <button
+          onClick={fetchEvents}
+          disabled={loading}
+          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 flex items-center"
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </button>
       </div>
+
+      {/* Error State */}
+      {error && (
+        <div className="mb-6 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+          {error}
+        </div>
+      )}
 
       {/* Filters */}
       <div className="mb-6 flex flex-col sm:flex-row gap-4">
@@ -142,8 +167,24 @@ const Events = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredEvents.map((event) => (
-                <tr key={event.id} className="hover:bg-gray-50">
+              {loading ? (
+                <tr>
+                  <td colSpan="5" className="px-6 py-4 text-center text-gray-500">
+                    <div className="flex items-center justify-center">
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      Loading events...
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredEvents.length === 0 ? (
+                <tr>
+                  <td colSpan="5" className="px-6 py-4 text-center text-gray-500">
+                    No events found
+                  </td>
+                </tr>
+              ) : (
+                filteredEvents.map((event) => (
+                  <tr key={event.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getTypeColor(event.type)}`}>
@@ -169,7 +210,8 @@ const Events = () => {
                     </pre>
                   </td>
                 </tr>
-              ))}
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -177,8 +219,8 @@ const Events = () => {
 
       {/* Live indicator */}
       <div className="mt-4 flex items-center text-sm text-gray-500">
-        <div className="h-2 w-2 bg-green-400 rounded-full animate-pulse mr-2"></div>
-        Live updates • {filteredEvents.length} events shown
+        <div className={`h-2 w-2 rounded-full mr-2 ${!error ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`}></div>
+        {!error ? 'Live updates' : 'Connection error'} • {filteredEvents.length} events shown
       </div>
     </div>
   );

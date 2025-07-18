@@ -140,6 +140,9 @@ class StorageService:
                     event_data["type"] = event.type.value
                     event_data["severity"] = event.severity.value
                     
+                    # Fix parameter mapping: metadata -> event_metadata
+                    event_data["event_metadata"] = event_data.pop("metadata", {})
+                    
                     # Store in events table
                     await session.execute(
                         text("""
@@ -205,6 +208,11 @@ class StorageService:
                     for row in rows:
                         event_data = dict(row)
                         event_data['id'] = UUID(event_data['id'])
+                        
+                        # Fix parameter mapping: event_metadata -> metadata
+                        if 'event_metadata' in event_data:
+                            event_data['metadata'] = event_data.pop('event_metadata', {})
+                        
                         events.append(Event(**event_data))
                     
                     storage_requests_total.labels(operation="query", status="success").inc()
@@ -434,7 +442,7 @@ async def start_event_consumer(storage_service_instance: StorageService):
         # Declare queue and bind to events exchange
         queue = await message_broker.declare_queue(
             queue_name="storage.events",
-            routing_key="events.*",
+            routing_key="events.#",
             exchange_name="events",
             durable=True
         )
