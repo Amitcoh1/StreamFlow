@@ -143,7 +143,7 @@ services:
       dockerfile: ./docker/dashboard/Dockerfile
     container_name: streamflow-dashboard
     ports:
-      - "8004:8000"
+      - "8004:8002"
     environment:
       - ENVIRONMENT=development
       - RABBITMQ_URL=amqp://admin:admin123@rabbitmq:5672/
@@ -163,6 +163,12 @@ services:
     volumes:
       - ./logs:/app/logs
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   storage:
     build:
@@ -170,7 +176,7 @@ services:
       dockerfile: ./docker/storage/Dockerfile
     container_name: streamflow-storage
     ports:
-      - "8005:8005"
+      - "8005:8004"
     environment:
       - ENVIRONMENT=development
       - RABBITMQ_URL=amqp://admin:admin123@rabbitmq:5672/
@@ -190,6 +196,12 @@ services:
     volumes:
       - ./logs:/app/logs
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8004/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   # Monitoring Services
   prometheus:

@@ -14,10 +14,12 @@ from uuid import UUID
 from fastapi import FastAPI, HTTPException, Depends, WebSocket, WebSocketDisconnect, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 import uvicorn
 import json
+from prometheus_client import Counter, Histogram, generate_latest
+from prometheus_client.openmetrics.exposition import CONTENT_TYPE_LATEST
 
 from streamflow.shared.config import get_settings
 from streamflow.shared.models import (
@@ -354,6 +356,12 @@ async def health_check():
 async def readiness_check():
     """Readiness check endpoint"""
     return {"status": "ready", "service": "dashboard"}
+
+
+@app.get("/metrics")
+async def get_prometheus_metrics():
+    """Prometheus metrics endpoint"""
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
 # Metrics endpoints

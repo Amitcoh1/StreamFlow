@@ -136,14 +136,16 @@ class StorageService:
                     # Convert event to dict for storage
                     event_data = event.model_dump()
                     event_data['id'] = str(event.id)
-                    event_data['timestamp'] = event.timestamp
+                    event_data["timestamp"] = event.timestamp
+                    event_data["type"] = event.type.value
+                    event_data["severity"] = event.severity.value
                     
                     # Store in events table
                     await session.execute(
                         text("""
-                        INSERT INTO events (id, type, source, timestamp, severity, data, metadata, 
+                        INSERT INTO events (id, type, source, timestamp, severity, data, event_metadata, 
                                           correlation_id, session_id, user_id, tags)
-                        VALUES (:id, :type, :source, :timestamp, :severity, :data, :metadata,
+                        VALUES (:id, :type, :source, :timestamp, :severity, :data, :event_metadata,
                                 :correlation_id, :session_id, :user_id, :tags)
                         """),
                         event_data
@@ -363,6 +365,10 @@ async def lifespan(app: FastAPI):
     # Start background tasks
     cleanup_task_handle = asyncio.create_task(cleanup_task())
     
+    # Start consuming events from message broker
+    storage_service_instance = get_storage_service()
+    consumer_task = asyncio.create_task(start_event_consumer(storage_service_instance))
+    
     logger.info("Data Storage Service started successfully!")
     
     yield
@@ -387,7 +393,7 @@ async def create_tables():
                     timestamp TIMESTAMP NOT NULL,
                     severity VARCHAR(20) NOT NULL,
                     data JSONB,
-                    metadata JSONB,
+                    event_metadata JSONB,
                     correlation_id VARCHAR(100),
                     session_id VARCHAR(100),
                     user_id VARCHAR(100),
@@ -414,10 +420,55 @@ async def cleanup_task():
     while True:
         try:
             await asyncio.sleep(3600)  # Run every hour
-            service = await get_storage_service()
+            service = get_storage_service()
             await service.cleanup_old_data()
         except Exception as e:
             logger.error(f"Error in cleanup task: {e}")
+
+
+async def start_event_consumer(storage_service_instance: StorageService):
+    """Start consuming events from message broker"""
+    try:
+        logger.info("Starting event consumer...")
+        
+        # Declare queue and bind to events exchange
+        queue = await message_broker.declare_queue(
+            queue_name="storage.events",
+            routing_key="events.*",
+            exchange_name="events",
+            durable=True
+        )
+        
+        async def process_event(envelope):
+            """Process received event"""
+            try:
+                # Extract event data from envelope payload
+                event_data = envelope.payload
+                logger.info(f"Processing event: {event_data.get('id', 'unknown')}")
+                
+                # Convert dict to Event object
+                event = Event(**event_data)
+                
+                # Store the event
+                success = await storage_service_instance.store_event(event)
+                if success:
+                    logger.info(f"Successfully stored event: {event.id}")
+                else:
+                    logger.error(f"Failed to store event: {event.id}")
+                    
+            except Exception as e:
+                logger.error(f"Error processing event: {e}")
+        
+        # Start consuming messages
+        await message_broker.consume(
+            queue_name="storage.events",
+            callback=process_event,
+            auto_ack=False
+        )
+        logger.info("Event consumer started successfully")
+        
+    except Exception as e:
+        logger.error(f"Error starting event consumer: {e}")
 
 
 # Create FastAPI app
@@ -514,6 +565,12 @@ async def health_check():
             "error": str(e),
             "timestamp": datetime.now().isoformat()
         }
+
+
+@app.get("/ready")
+async def readiness_check():
+    """Readiness check endpoint"""
+    return {"status": "ready", "service": "storage"}
 
 
 @app.get("/metrics")
