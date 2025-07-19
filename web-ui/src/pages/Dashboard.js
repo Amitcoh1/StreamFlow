@@ -46,9 +46,9 @@ const Dashboard = () => {
         
         setMetrics({
           totalEvents: data.total_events || 0,
-          eventsPerSecond: data.real_time_metrics?.events_per_second || 0,
-          activeConnections: data.active_connections || 0,
-          alertsToday: data.real_time_metrics?.active_alerts || 0,
+          eventsPerSecond: data.real_time_metrics?.events_per_second?.value || 0,
+          activeConnections: data.real_time_metrics?.active_connections?.value || 0,
+          alertsToday: data.real_time_metrics?.active_alerts?.value || 0,
         });
 
         // Convert events by type to chart data for alerts
@@ -87,8 +87,8 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchMetrics();
-    // Update metrics every 5 seconds
-    const interval = setInterval(fetchMetrics, 5000);
+    // Update metrics every 15 seconds (reduced frequency to prevent flickering)
+    const interval = setInterval(fetchMetrics, 15000);
     return () => clearInterval(interval);
   }, [fetchMetrics]);
 

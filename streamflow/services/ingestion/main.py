@@ -194,8 +194,7 @@ async def readiness_check():
 @app.post("/events", response_model=APIResponse)
 async def create_event(
     event_request: EventCreateRequest,
-    background_tasks: BackgroundTasks,
-    user=Depends(authenticate_user)
+    background_tasks: BackgroundTasks
 ):
     """Create a single event"""
     try:
@@ -207,7 +206,7 @@ async def create_event(
             severity=event_request.severity,
             correlation_id=event_request.correlation_id,
             session_id=event_request.session_id,
-            user_id=event_request.user_id or user.get("user_id"),
+            user_id=event_request.user_id,
             tags=event_request.tags
         )
         

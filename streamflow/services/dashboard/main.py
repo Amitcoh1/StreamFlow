@@ -539,14 +539,13 @@ async def delete_dashboard(
 async def get_events(
     limit: int = Query(default=50, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
-    event_type: Optional[str] = Query(default=None),
-    user=Depends(authenticate_user)
+    event_type: Optional[str] = Query(default=None)
 ):
     """Get recent events from storage service"""
     
     try:
         # Query storage service for events
-        storage_url = f"http://storage:8005/api/v1/events/query"
+        storage_url = f"http://storage:8004/api/v1/events/query"
         query_data = {
             "limit": limit,
             "offset": offset
@@ -580,7 +579,7 @@ async def get_events(
 
 
 @app.get("/api/v1/stats")
-async def get_dashboard_stats(user=Depends(authenticate_user)):
+async def get_dashboard_stats():
     """Get dashboard statistics including real events count"""
     
     try:
@@ -588,7 +587,7 @@ async def get_dashboard_stats(user=Depends(authenticate_user)):
         storage_stats = {}
         try:
             async with httpx.AsyncClient() as client:
-                response = await client.get("http://storage:8005/api/v1/stats", timeout=10)
+                response = await client.get("http://storage:8004/api/v1/stats", timeout=10)
                 response.raise_for_status()
                 storage_stats = response.json()
         except Exception as e:

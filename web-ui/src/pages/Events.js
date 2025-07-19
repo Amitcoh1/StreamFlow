@@ -48,8 +48,8 @@ const Events = () => {
 
   useEffect(() => {
     fetchEvents();
-    // Auto-refresh every 10 seconds
-    const interval = setInterval(fetchEvents, 10000);
+    // Auto-refresh every 30 seconds (reduced frequency to prevent flickering)
+    const interval = setInterval(fetchEvents, 30000);
     return () => clearInterval(interval);
   }, [fetchEvents]);
 

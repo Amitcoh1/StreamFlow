@@ -143,13 +143,22 @@ class StorageService:
                     # Fix parameter mapping: metadata -> event_metadata
                     event_data["event_metadata"] = event_data.pop("metadata", {})
                     
+                    # Add created_at timestamp for database
+                    event_data["created_at"] = datetime.now()
+                    
+                    # Convert dict fields to JSON strings for PostgreSQL
+                    import json
+                    event_data["data"] = json.dumps(event_data.get("data", {}))
+                    event_data["event_metadata"] = json.dumps(event_data.get("event_metadata", {}))
+                    event_data["tags"] = json.dumps(event_data.get("tags", []))
+                    
                     # Store in events table
                     await session.execute(
                         text("""
                         INSERT INTO events (id, type, source, timestamp, severity, data, event_metadata, 
-                                          correlation_id, session_id, user_id, tags)
+                                          correlation_id, session_id, user_id, tags, created_at)
                         VALUES (:id, :type, :source, :timestamp, :severity, :data, :event_metadata,
-                                :correlation_id, :session_id, :user_id, :tags)
+                                :correlation_id, :session_id, :user_id, :tags, :created_at)
                         """),
                         event_data
                     )
@@ -206,12 +215,24 @@ class StorageService:
                     # Convert to Event objects
                     events = []
                     for row in rows:
-                        event_data = dict(row)
-                        event_data['id'] = UUID(event_data['id'])
+                        # Convert SQLAlchemy row to dictionary properly
+                        event_data = dict(row._mapping)
+                        event_data['id'] = UUID(str(event_data['id']))
+                        
+                        # Convert JSON strings back to Python objects
+                        import json
+                        if 'data' in event_data and isinstance(event_data['data'], str):
+                            event_data['data'] = json.loads(event_data['data'])
+                        if 'tags' in event_data and isinstance(event_data['tags'], str):
+                            event_data['tags'] = json.loads(event_data['tags'])
                         
                         # Fix parameter mapping: event_metadata -> metadata
                         if 'event_metadata' in event_data:
-                            event_data['metadata'] = event_data.pop('event_metadata', {})
+                            metadata_val = event_data.pop('event_metadata', {})
+                            if isinstance(metadata_val, str):
+                                event_data['metadata'] = json.loads(metadata_val)
+                            else:
+                                event_data['metadata'] = metadata_val
                         
                         events.append(Event(**event_data))
                     
@@ -520,6 +541,35 @@ async def query_events(
     """Query events from storage"""
     events = await service.query_events(query)
     return events
+
+
+@app.get("/api/v1/events", response_model=List[Event])
+async def get_events(
+    limit: int = Query(100, le=10000, description="Maximum number of events to return"),
+    offset: int = Query(0, ge=0, description="Number of events to skip"),
+    event_type: Optional[str] = Query(None, description="Filter by event type"),
+    source: Optional[str] = Query(None, description="Filter by event source"),
+    start_time: Optional[datetime] = Query(None, description="Filter events after this time"),
+    end_time: Optional[datetime] = Query(None, description="Filter events before this time"),
+    service: StorageService = Depends(get_storage_service)
+):
+    """Get events with optional filtering"""
+    try:
+        # Create query object from parameters
+        query = StorageQuery(
+            limit=limit,
+            offset=offset,
+            event_types=[event_type] if event_type else None,
+            sources=[source] if source else None,
+            start_time=start_time,
+            end_time=end_time
+        )
+        
+        events = await service.query_events(query)
+        return events
+    except Exception as e:
+        logger.error(f"Error retrieving events: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve events")
 
 
 @app.get("/api/v1/stats", response_model=StorageStats)
