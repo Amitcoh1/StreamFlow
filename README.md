@@ -1,429 +1,370 @@
 # StreamFlow 🌊
 
-<div align="center">
+A **production-ready real-time analytics platform** for event processing, monitoring, and insights. StreamFlow provides comprehensive analytics dashboards, intelligent alerting, and scalable data processing with **real-time calculations** from live data sources.
 
-**Enterprise-Grade Real-Time Analytics Pipeline**
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python](https://img.shields.io/badge/Python-3.8%2B-blue.svg)](https://python.org)
+[![React](https://img.shields.io/badge/React-18.0%2B-61DAFB.svg)](https://reactjs.org)
+[![Kubernetes](https://img.shields.io/badge/Kubernetes-1.28%2B-326CE5.svg)](https://kubernetes.io)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg)](https://docker.com)
 
-[![Python](https://img.shields.io/badge/Python-3.8%2B-blue?logo=python&logoColor=white)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.104-green?logo=fastapi)](https://fastapi.tiangolo.com)
-[![React](https://img.shields.io/badge/React-18.2-61DAFB?logo=react)](https://reactjs.org)
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](https://docker.com)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Build](https://img.shields.io/badge/Build-Passing-brightgreen.svg)](https://github.com/Amitcoh1/StreamFlow)
+## ✨ Features
 
-*High-performance, scalable real-time analytics with modern React dashboard*
+### 📊 **Real-Time Analytics**
+- **Live Event Trends**: Real-time event processing with time-series analysis
+- **User Distribution**: Device and browser analytics from actual user-agent data
+- **Source Analytics**: Top event sources with user counts and activity metrics
+- **Event Type Analysis**: Distribution and patterns of different event types
+- **Interactive Dashboards**: Modern React UI with live data refresh
 
-[🚀 Quick Start](#-quick-start) • [📱 Dashboard](#-react-dashboard) • [🏗️ Architecture](#️-architecture) • [📖 Documentation](#-documentation)
+### 🚨 **Intelligent Alerting**
+- **Real Alert Management**: Active alerts from database with status tracking
+- **Alert Statistics**: Live counts by status (active, acknowledged, resolved)
+- **Alert Actions**: Acknowledge and resolve alerts via REST API
+- **Alert History**: Historical trends and pattern analysis
+- **Multi-Channel Notifications**: Email, Slack, and webhook support
 
-</div>
+### 🔄 **Event Processing**
+- **High-Throughput Ingestion**: Scalable event ingestion with validation
+- **Stream Processing**: Real-time event analysis and aggregation
+- **Data Storage**: Optimized PostgreSQL storage with JSON serialization
+- **Message Queuing**: RabbitMQ for reliable event distribution
+- **Caching Layer**: Redis for high-performance data access
 
----
+### 🏗️ **Production Infrastructure**
+- **Multiple Deployment Options**: Terraform (AWS), Helm (K8s), Direct Manifests
+- **Auto-Scaling**: Horizontal Pod Autoscaling based on CPU/memory
+- **Health Monitoring**: Comprehensive health checks and metrics
+- **Security**: RBAC, network policies, TLS encryption, and secure defaults
+- **High Availability**: Multi-replica deployments with rolling updates
 
-## ✨ Key Features
+## 🏛️ Architecture
 
-<table>
-<tr>
-<td width="50%">
-
-### 🚀 **High Performance**
-- **1M+ events/sec** processing capability
-- **<50ms latency** end-to-end processing
-- **Horizontal scaling** with Docker Swarm/K8s
-- **Circuit breakers** and fault tolerance
-
-</td>
-<td width="50%">
-
-### 📊 **Modern Dashboard**
-- **Real-time analytics** React UI
-- **Live event monitoring** with WebSocket
-- **Interactive charts** and visualizations
-- **Responsive design** for all devices
-
-</td>
-</tr>
-<tr>
-<td>
-
-### 🔧 **Developer Experience**
-- **REST APIs** with OpenAPI documentation
-- **Hot reloading** development setup
-- **Comprehensive testing** suite
-- **Type-safe** Python with Pydantic
-
-</td>
-<td>
-
-### 📈 **Enterprise Ready**
-- **Prometheus metrics** integration
-- **Grafana dashboards** for monitoring
-- **JWT authentication** and RBAC
-- **Multi-tier storage** strategy
-
-</td>
-</tr>
-</table>
-
----
-
-## 📱 React Dashboard
-
-<div align="center">
-
-![StreamFlow Dashboard](https://via.placeholder.com/800x450/1a1a1a/00d4aa?text=StreamFlow+Dashboard+UI)
-
-*Modern, responsive dashboard built with React and Tailwind CSS*
-
-</div>
-
-### 🎯 Dashboard Features
-
-| Feature | Description | Status |
-|---------|-------------|--------|
-| **📊 Real-time Analytics** | Live event processing metrics and KPIs | ✅ Active |
-| **🔔 Alert Management** | Configure and monitor alert rules | ✅ Active |
-| **📋 Event Explorer** | Browse and filter real-time event streams | ✅ Active |
-| **⚙️ System Settings** | Configure services and monitoring | ✅ Active |
-| **📈 Historical Data** | Time-series charts and trend analysis | ✅ Active |
-
-### 🌐 Access Points
-
-- **🖥️ Main Dashboard**: http://localhost:3001
-- **📊 Grafana Monitoring**: http://localhost:3000
-- **🔍 Prometheus Metrics**: http://localhost:9090
-- **🐰 RabbitMQ Management**: http://localhost:15672
-
----
-
-## 🏗️ System Architecture
-
-```mermaid
-graph TB
-    subgraph "Client Layer"
-        UI[React Dashboard<br/>Port 3001]
-        API_CLIENTS[API Clients]
-    end
-    
-    subgraph "Gateway Layer"
-        NGINX[Nginx Proxy<br/>Port 80]
-    end
-    
-    subgraph "Service Layer"
-        INGESTION[Ingestion Service<br/>Port 8001]
-        ANALYTICS[Analytics Service<br/>Port 8002]
-        ALERTING[Alerting Service<br/>Port 8003]
-        DASHBOARD[Dashboard API<br/>Port 8004]
-        STORAGE[Storage Service<br/>Port 8005]
-    end
-    
-    subgraph "Message Layer"
-        RABBITMQ[RabbitMQ<br/>Port 5672]
-    end
-    
-    subgraph "Data Layer"
-        POSTGRES[(PostgreSQL<br/>Port 5432)]
-        REDIS[(Redis<br/>Port 6379)]
-    end
-    
-    subgraph "Monitoring Layer"
-        PROMETHEUS[Prometheus<br/>Port 9090]
-        GRAFANA[Grafana<br/>Port 3000]
-    end
-    
-    UI --> NGINX
-    API_CLIENTS --> NGINX
-    NGINX --> INGESTION
-    NGINX --> DASHBOARD
-    
-    INGESTION --> RABBITMQ
-    ANALYTICS --> RABBITMQ
-    ALERTING --> RABBITMQ
-    STORAGE --> RABBITMQ
-    
-    ANALYTICS --> POSTGRES
-    STORAGE --> POSTGRES
-    DASHBOARD --> REDIS
-    
-    PROMETHEUS --> INGESTION
-    PROMETHEUS --> ANALYTICS
-    PROMETHEUS --> ALERTING
-    PROMETHEUS --> DASHBOARD
-    PROMETHEUS --> STORAGE
-    
-    GRAFANA --> PROMETHEUS
 ```
-
----
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Web UI        │    │   Dashboard     │    │   Analytics     │
+│   (React)       │    │   API           │    │   Engine        │
+│   Port: 3000    │    │   Port: 8005    │    │   Port: 8002    │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       │
+         └───────────────────────┼───────────────────────┘
+                                 │
+         ┌───────────────────────┼───────────────────────┐
+         │                       │                       │
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Ingestion     │    │   Storage       │    │   Alerting      │
+│   Service       │    │   Service       │    │   Service       │
+│   Port: 8001    │    │   Port: 8004    │    │   Port: 8003    │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       │
+         └───────────────────────┼───────────────────────┘
+                                 │
+┌─────────────────────────────────────────────────────────────────┐
+│                    Infrastructure                               │
+│  PostgreSQL │ Redis │ RabbitMQ │ Prometheus │ Grafana          │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ## 🚀 Quick Start
 
-### 📋 Prerequisites
-
-| Component | Version | Purpose |
-|-----------|---------|---------|
-| **Docker** | 20.10+ | Container orchestration |
-| **Docker Compose** | 2.0+ | Multi-container deployment |
-| **Node.js** | 16+ | React development (optional) |
-| **Python** | 3.8+ | Backend development (optional) |
-
-### ⚡ One-Command Setup
+### Local Development
 
 ```bash
-# Clone and start the entire system
-git clone https://github.com/Amitcoh1/StreamFlow.git
-cd StreamFlow
-chmod +x start.sh
+# Clone the repository
+git clone https://github.com/your-org/streamflow.git
+cd streamflow
+
+# Start infrastructure services
 ./start.sh
-```
-
-### 🐳 Docker Deployment
-
-```bash
-# Start all services
-docker-compose up -d
-
-# Check service health
-docker-compose ps
-
-# View logs
-docker-compose logs -f
-```
-
-### 🌐 Access the Dashboard
-
-1. **🖥️ Open your browser** to http://localhost:3001
-2. **📊 View real-time metrics** on the main dashboard
-3. **🔔 Configure alerts** in the alerts section
-4. **📋 Monitor events** in the events explorer
-
----
-
-## 🧪 Send Test Events
-
-```bash
-# Send a test event via API
-curl -X POST http://localhost:8001/events \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "user.click",
-    "data": {
-      "user_id": "test_user_123",
-      "page": "/dashboard",
-      "timestamp": "2024-01-01T12:00:00Z"
-    }
-  }'
-
-# Watch events appear in real-time in the React dashboard!
-```
-
----
-
-## 🔧 Development Setup
-
-### 🎨 Frontend Development
-
-```bash
-# Navigate to the React app
-cd web-ui
 
 # Install dependencies
-npm install
-
-# Start development server
-npm start
-
-# The app will open at http://localhost:3001
-```
-
-### 🐍 Backend Development
-
-```bash
-# Install Python dependencies
 pip install -r requirements.txt
+cd web-ui && npm install
 
-# Install in development mode
-pip install -e .
+# Start services
+python -m streamflow.services.storage.main &
+python -m streamflow.services.analytics.main &
+python -m streamflow.services.alerting.main &
+python -m streamflow.services.dashboard.main &
+python -m streamflow.services.ingestion.main &
 
-# Start individual services
-python -m services.ingestion.main
-python -m services.analytics.main
-python -m services.dashboard.main
+# Start web UI
+cd web-ui && npm start
 ```
 
----
+Access the application at `http://localhost:3000`
 
-## 📊 Monitoring & Observability
+### Production Deployment
 
-### 📈 Metrics Dashboard
+Choose your preferred deployment method:
 
-| Service | Metrics Endpoint | Purpose |
-|---------|------------------|---------|
-| **Ingestion** | `http://localhost:8001/metrics` | Event intake rates |
-| **Analytics** | `http://localhost:8002/metrics` | Processing performance |
-| **Dashboard** | `http://localhost:8004/metrics` | API response times |
-| **Storage** | `http://localhost:8005/metrics` | Storage operations |
-
-### 🔍 Health Checks
-
+#### Option 1: AWS with Terraform
 ```bash
-# Check all services
-curl http://localhost:8001/health  # Ingestion
-curl http://localhost:8002/health  # Analytics  
-curl http://localhost:8004/health  # Dashboard
-curl http://localhost:8005/ready   # Storage
+cd terraform
+terraform init
+terraform apply
 ```
 
----
-
-## 🛠️ Service Configuration
-
-### 🌍 Environment Variables
-
+#### Option 2: Kubernetes with Helm
 ```bash
-# Core Services
-INGESTION_PORT=8001
-ANALYTICS_PORT=8002
-ALERTING_PORT=8003
-DASHBOARD_PORT=8004
-STORAGE_PORT=8005
-
-# Infrastructure
-RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
-DATABASE_URL=postgresql://streamflow:password@postgres:5432/streamflow
-REDIS_URL=redis://redis:6379
-
-# React UI
-REACT_APP_API_URL=http://localhost:8004
-REACT_APP_WS_URL=ws://localhost:8004
+helm install streamflow ./helm/streamflow/ \
+  --namespace streamflow --create-namespace
 ```
 
-### 📁 Project Structure
-
-```
-StreamFlow/
-├── web-ui/                 # React Dashboard
-│   ├── src/
-│   │   ├── components/     # Reusable UI components
-│   │   ├── pages/         # Dashboard pages
-│   │   └── utils/         # Utility functions
-│   └── package.json
-├── services/              # Backend Services
-│   ├── ingestion/         # Event ingestion API
-│   ├── analytics/         # Stream processing
-│   ├── dashboard/         # Dashboard API
-│   └── storage/           # Data persistence
-├── shared/                # Shared libraries
-├── docker/                # Docker configurations
-└── docs/                  # Documentation
+#### Option 3: Direct Kubernetes
+```bash
+kubectl apply -f k8s/
 ```
 
----
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed instructions.
+
+## 📱 User Interface
+
+### Analytics Dashboard
+- **Real-time event trends** with customizable time intervals
+- **User distribution** by device type and browser
+- **Top event sources** with activity metrics
+- **Event type analysis** with visual breakdowns
+- **Export functionality** for data analysis
+
+### Alerts Management
+- **Active alerts** with status tracking and management
+- **Alert statistics** by severity and status
+- **Bulk operations** for acknowledging and resolving alerts
+- **Alert history** and trend analysis
+- **Real-time notifications** via WebSocket
+
+### System Dashboard
+- **Live metrics** showing system performance
+- **Service health** monitoring and status
+- **Event processing** rates and throughput
+- **Resource utilization** and scaling metrics
+- **WebSocket connections** for real-time updates
+
+## 🔧 Configuration
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DB_HOST` | PostgreSQL host | `localhost` |
+| `DB_PORT` | PostgreSQL port | `5432` |
+| `DB_NAME` | Database name | `streamflow` |
+| `REDIS_HOST` | Redis host | `localhost` |
+| `REDIS_PORT` | Redis port | `6379` |
+| `RABBITMQ_HOST` | RabbitMQ host | `localhost` |
+| `LOG_LEVEL` | Logging level | `INFO` |
+| `ENVIRONMENT` | Environment | `development` |
+
+### Service Ports
+
+| Service | Port | Description |
+|---------|------|-------------|
+| Ingestion | 8001 | Event ingestion API |
+| Analytics | 8002 | Analytics processing |
+| Alerting | 8003 | Alert management |
+| Storage | 8004 | Data storage API |
+| Dashboard | 8005 | Main dashboard API |
+| Web UI | 3000 | React frontend |
+
+## 📊 API Documentation
+
+### Event Ingestion
+```bash
+# Create event
+POST /api/v1/events
+{
+  "type": "web.click",
+  "source": "web-app",
+  "data": {"page": "/dashboard", "user_id": "123"},
+  "user_id": "user123"
+}
+```
+
+### Analytics
+```bash
+# Get event trends
+GET /api/v1/analytics/event-trends?hours=24&interval_minutes=60
+
+# Get user distribution
+GET /api/v1/analytics/user-distribution
+
+# Get top sources
+GET /api/v1/analytics/top-sources?limit=10
+```
+
+### Alerts
+```bash
+# Get alerts
+GET /api/v1/alerts?status=active&limit=50
+
+# Acknowledge alert
+POST /api/v1/alerts/{alert_id}/acknowledge
+
+# Resolve alert
+POST /api/v1/alerts/{alert_id}/resolve
+```
+
+See [API.md](./docs/API.md) for complete API documentation.
 
 ## 🧪 Testing
 
-### 🔬 Run Test Suite
-
 ```bash
-# Backend tests
-pytest tests/ -v --cov=services
+# Run backend tests
+python -m pytest tests/
 
-# Frontend tests  
-cd web-ui
-npm test
+# Run frontend tests
+cd web-ui && npm test
 
-# Integration tests
-pytest tests/integration/ -v
+# Run integration tests
+python -m pytest tests/test_comprehensive.py
 
 # Load testing
-pytest tests/performance/ -v
+python examples/usage_examples.py
 ```
 
-### 📊 Test Coverage
+## 🔐 Security
 
-| Component | Coverage | Status |
-|-----------|----------|--------|
-| **Ingestion Service** | 95% | ✅ |
-| **Analytics Service** | 92% | ✅ |
-| **Dashboard API** | 88% | ✅ |
-| **Storage Service** | 90% | ✅ |
-| **React Components** | 85% | ✅ |
+- **Authentication**: JWT-based authentication for API access
+- **Authorization**: Role-based access control (RBAC)
+- **Encryption**: TLS/SSL for all communication
+- **Input Validation**: Comprehensive request validation
+- **Security Headers**: CORS, CSP, and other security headers
+- **Network Policies**: Kubernetes network segmentation
+- **Pod Security**: Non-root containers with minimal privileges
 
----
+## 📈 Monitoring & Observability
 
-## 🚀 Production Deployment
+### Health Checks
+All services expose health endpoints at `/health` and `/ready`
 
-### 🐳 Docker Production
+### Metrics
+- **Prometheus integration** for metrics collection
+- **Grafana dashboards** for visualization
+- **Custom metrics** for business intelligence
+- **Performance monitoring** and alerting
 
+### Logging
+- **Structured logging** with JSON format
+- **Centralized logging** with ELK stack integration
+- **Log aggregation** across all services
+- **Error tracking** and debugging
+
+## 🔄 Scaling
+
+### Horizontal Scaling
 ```bash
-# Production deployment
-docker-compose -f docker-compose.prod.yml up -d
+# Scale specific services
+kubectl scale deployment streamflow-analytics --replicas=5
+kubectl scale deployment streamflow-storage --replicas=3
 
-# Scale analytics service
-docker-compose -f docker-compose.prod.yml up -d --scale analytics=3
+# Auto-scaling based on CPU
+kubectl autoscale deployment streamflow-analytics \
+  --cpu-percent=70 --min=2 --max=10
 ```
 
-### ☸️ Kubernetes
+### Performance Optimization
+- **Connection pooling** for database connections
+- **Redis caching** for frequently accessed data
+- **Async processing** for non-blocking operations
+- **Load balancing** across service replicas
 
+## 🛠️ Development
+
+### Project Structure
+```
+streamflow/
+├── services/           # Backend microservices
+│   ├── ingestion/     # Event ingestion service
+│   ├── analytics/     # Analytics processing
+│   ├── alerting/      # Alert management
+│   ├── storage/       # Data storage service
+│   └── dashboard/     # Dashboard API
+├── web-ui/            # React frontend
+├── shared/            # Shared utilities
+├── terraform/         # AWS infrastructure
+├── helm/              # Helm charts
+├── k8s/               # Kubernetes manifests
+├── tests/             # Test suites
+└── docs/              # Documentation
+```
+
+### Contributing
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests
+5. Submit a pull request
+
+### Development Setup
 ```bash
-# Deploy with Helm
-helm install streamflow ./k8s/helm-chart
+# Setup development environment
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 
-# Scale deployment
-kubectl scale deployment analytics --replicas=5
+# Install pre-commit hooks
+pre-commit install
+
+# Run development services
+docker-compose up -d
 ```
 
----
+## 📋 Requirements
 
-## 📖 Documentation
+### System Requirements
+- **Python**: 3.8+
+- **Node.js**: 16+
+- **PostgreSQL**: 12+
+- **Redis**: 6+
+- **RabbitMQ**: 3.8+
 
-| Resource | Description | Link |
-|----------|-------------|------|
-| **📚 API Documentation** | Interactive API docs with Swagger | [API Docs](docs/API.md) |
-| **🏗️ Architecture Guide** | System design and patterns | [Architecture](docs/architecture.md) |
-| **🚀 Deployment Guide** | Production deployment strategies | [Deployment](docs/deployment.md) |
-| **💡 Usage Examples** | Code samples and tutorials | [Examples](examples/) |
+### Kubernetes Requirements
+- **Kubernetes**: 1.28+
+- **Helm**: 3.0+ (for Helm deployment)
+- **NGINX Ingress Controller**
+- **cert-manager** (for TLS)
 
----
+### AWS Requirements (Terraform)
+- **EKS**: 1.28+
+- **RDS**: PostgreSQL 15+
+- **ElastiCache**: Redis 7+
+- **VPC**: Multi-AZ setup
 
-## 🤝 Contributing
+## 📚 Documentation
 
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+- [Deployment Guide](./DEPLOYMENT.md) - Comprehensive deployment instructions
+- [API Documentation](./docs/API.md) - Complete API reference
+- [Contributing Guide](./CONTRIBUTING.md) - Development guidelines
+- [Getting Started](./GETTING_STARTED.md) - Quick start tutorial
 
-### 🔄 Development Workflow
+## 🆘 Support
 
-1. **🍴 Fork** the repository
-2. **🌿 Create** your feature branch (`git checkout -b feature/amazing-feature`)
-3. **✅ Test** your changes (`npm test && pytest`)
-4. **📝 Commit** your changes (`git commit -m 'Add amazing feature'`)
-5. **🚀 Push** to the branch (`git push origin feature/amazing-feature`)
-6. **📥 Open** a Pull Request
+### Troubleshooting
+Common issues and solutions:
 
----
+1. **Services not starting**: Check logs with `kubectl logs -f deployment/streamflow-service`
+2. **Database connection errors**: Verify connection strings and credentials
+3. **UI not loading**: Check ingress configuration and DNS resolution
+4. **Performance issues**: Monitor resource usage and scale accordingly
+
+### Getting Help
+- **Issues**: [GitHub Issues](https://github.com/your-org/streamflow/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/your-org/streamflow/discussions)
+- **Documentation**: [Project Wiki](https://github.com/your-org/streamflow/wiki)
 
 ## 📄 License
 
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- Built with [FastAPI](https://fastapi.tiangolo.com/) for high-performance APIs
+- Frontend powered by [React](https://reactjs.org/) and [Tailwind CSS](https://tailwindcss.com/)
+- Charts created with [Recharts](https://recharts.org/)
+- Infrastructure managed with [Terraform](https://terraform.io/) and [Kubernetes](https://kubernetes.io/)
+- Monitoring with [Prometheus](https://prometheus.io/) and [Grafana](https://grafana.com/)
 
 ---
 
-## 🏆 Acknowledgments
-
-- **FastAPI** for the excellent Python web framework
-- **React** and **Tailwind CSS** for the modern UI
-- **RabbitMQ** for reliable message queuing
-- **Prometheus** and **Grafana** for monitoring
-
----
-
-<div align="center">
-
-### 🌟 **Star this repo if you find it helpful!** 
-
-**Created with ❤️ by [Amit Cohen](https://github.com/Amitcoh1)**
-
-[![GitHub followers](https://img.shields.io/github/followers/Amitcoh1?style=social)](https://github.com/Amitcoh1)
-[![GitHub stars](https://img.shields.io/github/stars/Amitcoh1/StreamFlow?style=social)](https://github.com/Amitcoh1/StreamFlow)
-
-[🐛 Report Bug](https://github.com/Amitcoh1/StreamFlow/issues) • [💡 Request Feature](https://github.com/Amitcoh1/StreamFlow/issues) • [💬 Ask Question](https://github.com/Amitcoh1/StreamFlow/discussions)
-
-</div>
+**StreamFlow** - Real-time analytics platform for the modern enterprise 🌊

@@ -1,0 +1,408 @@
+# Global configuration
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+  storageClass: ""
+  postgresql:
+    auth:
+      postgresPassword: "streamflow"
+      username: "streamflow"
+      password: "streamflow"
+      database: "streamflow"
+  redis:
+    auth:
+      enabled: true
+      password: "streamflow"
+
+# StreamFlow application configuration
+streamflow:
+  # Environment
+  environment: "development"
+  debug: true
+  
+  # Image configuration
+  image:
+    registry: "docker.io"
+    repository: "streamflow"
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+  # Service configuration
+  services:
+    ingestion:
+      enabled: true
+      port: 8001
+      replicas: 2
+      image:
+        repository: "streamflow/ingestion"
+        tag: "latest"
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+      autoscaling:
+        enabled: true
+        minReplicas: 2
+        maxReplicas: 10
+        targetCPUUtilizationPercentage: 70
+      
+    analytics:
+      enabled: true
+      port: 8002
+      replicas: 2
+      image:
+        repository: "streamflow/analytics"
+        tag: "latest"
+      resources:
+        requests:
+          cpu: 200m
+          memory: 256Mi
+        limits:
+          cpu: 1000m
+          memory: 1Gi
+      autoscaling:
+        enabled: true
+        minReplicas: 2
+        maxReplicas: 10
+        targetCPUUtilizationPercentage: 70
+      
+    alerting:
+      enabled: true
+      port: 8003
+      replicas: 2
+      image:
+        repository: "streamflow/alerting"
+        tag: "latest"
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+      autoscaling:
+        enabled: true
+        minReplicas: 2
+        maxReplicas: 5
+        targetCPUUtilizationPercentage: 70
+      
+    storage:
+      enabled: true
+      port: 8004
+      replicas: 2
+      image:
+        repository: "streamflow/storage"
+        tag: "latest"
+      resources:
+        requests:
+          cpu: 200m
+          memory: 256Mi
+        limits:
+          cpu: 1000m
+          memory: 1Gi
+      autoscaling:
+        enabled: true
+        minReplicas: 2
+        maxReplicas: 8
+        targetCPUUtilizationPercentage: 70
+      
+    dashboard:
+      enabled: true
+      port: 8005
+      replicas: 2
+      image:
+        repository: "streamflow/dashboard"
+        tag: "latest"
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+      autoscaling:
+        enabled: true
+        minReplicas: 2
+        maxReplicas: 5
+        targetCPUUtilizationPercentage: 70
+
+    web_ui:
+      enabled: true
+      port: 3000
+      replicas: 2
+      image:
+        repository: "streamflow/web-ui"
+        tag: "latest"
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 200m
+          memory: 256Mi
+      autoscaling:
+        enabled: true
+        minReplicas: 2
+        maxReplicas: 5
+        targetCPUUtilizationPercentage: 70
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  hosts:
+    - host: streamflow.local
+      paths:
+        - path: /
+          pathType: Prefix
+          service: web-ui
+        - path: /api
+          pathType: Prefix
+          service: dashboard
+  tls:
+    - secretName: streamflow-tls
+      hosts:
+        - streamflow.local
+
+# Service configuration
+service:
+  type: ClusterIP
+  annotations: {}
+
+# ServiceAccount configuration
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# Security Context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 3000
+  fsGroup: 2000
+
+podSecurityContext:
+  seccompProfile:
+    type: RuntimeDefault
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Network Policy
+networkPolicy:
+  enabled: false
+  ingress: []
+  egress: []
+
+# ConfigMaps and Secrets
+config:
+  # Database configuration
+  database:
+    host: ""  # Will be set from postgresql service if enabled
+    port: 5432
+    name: "streamflow"
+    username: "streamflow"
+    password: "streamflow"
+    sslMode: "prefer"
+    maxConnections: 20
+    
+  # Redis configuration  
+  redis:
+    host: ""  # Will be set from redis service if enabled
+    port: 6379
+    password: "streamflow"
+    database: 0
+    
+  # RabbitMQ configuration
+  rabbitmq:
+    host: ""  # Will be set from rabbitmq service if enabled
+    port: 5672
+    username: "streamflow"
+    password: "streamflow"
+    vhost: "/"
+    
+  # Application configuration
+  app:
+    corsOrigins: ["http://localhost:3000", "https://streamflow.local"]
+    secretKey: "your-secret-key-change-this"
+    logLevel: "INFO"
+    
+  # External services
+  external:
+    prometheus:
+      enabled: false
+      url: ""
+    grafana:
+      enabled: false
+      url: ""
+
+# Monitoring and observability
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    scrapeTimeout: 10s
+  prometheusRule:
+    enabled: true
+
+# Persistence
+persistence:
+  enabled: true
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  size: 8Gi
+
+# Dependencies configuration
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: "streamflow"
+    username: "streamflow"
+    password: "streamflow"
+    database: "streamflow"
+  primary:
+    persistence:
+      enabled: true
+      size: 8Gi
+  metrics:
+    enabled: true
+
+redis:
+  enabled: true
+  auth:
+    enabled: true
+    password: "streamflow"
+  master:
+    persistence:
+      enabled: true
+      size: 8Gi
+  metrics:
+    enabled: true
+
+rabbitmq:
+  enabled: true
+  auth:
+    username: "streamflow"
+    password: "streamflow"
+  persistence:
+    enabled: true
+    size: 8Gi
+  metrics:
+    enabled: true
+
+# Prometheus monitoring
+prometheus:
+  enabled: false
+  server:
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+    persistentVolume:
+      enabled: true
+      size: 8Gi
+
+# Grafana dashboards
+grafana:
+  enabled: false
+  admin:
+    user: admin
+    password: streamflow
+  persistence:
+    enabled: true
+    size: 1Gi
+  datasources:
+    - name: Prometheus
+      type: prometheus
+      url: http://prometheus:9090
+      access: proxy
+      isDefault: true
+
+# Node selector, tolerations and affinity
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Pod annotations
+podAnnotations: {}
+
+# Pod labels
+podLabels: {}
+
+# Additional volumes
+extraVolumes: []
+
+# Additional volume mounts
+extraVolumeMounts: []
+
+# Additional environment variables
+extraEnvVars: []
+
+# Additional environment variables from ConfigMaps/Secrets
+extraEnvVarsConfigMap: ""
+extraEnvVarsSecret: ""
+
+# Init containers
+initContainers: []
+
+# Sidecar containers
+sidecars: []
+
+# Lifecycle hooks
+lifecycle: {}
+
+# Resource limits and requests
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Liveness and readiness probes
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6
+  successThreshold: 1
+
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /ready
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6
+  successThreshold: 1
+
+# Startup probe
+startupProbe:
+  enabled: false
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 30
+  successThreshold: 1 

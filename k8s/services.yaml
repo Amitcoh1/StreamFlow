@@ -1,0 +1,182 @@
+---
+# Ingestion Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: streamflow-ingestion
+  namespace: streamflow
+  labels:
+    app.kubernetes.io/name: streamflow-ingestion
+    app.kubernetes.io/instance: streamflow
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/component: ingestion
+    app.kubernetes.io/part-of: streamflow
+    app.kubernetes.io/managed-by: kubectl
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8001
+    targetPort: http
+    protocol: TCP
+    name: http
+  selector:
+    app.kubernetes.io/name: streamflow-ingestion
+    app.kubernetes.io/instance: streamflow
+
+---
+# Analytics Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: streamflow-analytics
+  namespace: streamflow
+  labels:
+    app.kubernetes.io/name: streamflow-analytics
+    app.kubernetes.io/instance: streamflow
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/component: analytics
+    app.kubernetes.io/part-of: streamflow
+    app.kubernetes.io/managed-by: kubectl
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8002
+    targetPort: http
+    protocol: TCP
+    name: http
+  selector:
+    app.kubernetes.io/name: streamflow-analytics
+    app.kubernetes.io/instance: streamflow
+
+---
+# Alerting Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: streamflow-alerting
+  namespace: streamflow
+  labels:
+    app.kubernetes.io/name: streamflow-alerting
+    app.kubernetes.io/instance: streamflow
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/component: alerting
+    app.kubernetes.io/part-of: streamflow
+    app.kubernetes.io/managed-by: kubectl
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8003
+    targetPort: http
+    protocol: TCP
+    name: http
+  selector:
+    app.kubernetes.io/name: streamflow-alerting
+    app.kubernetes.io/instance: streamflow
+
+---
+# Storage Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: streamflow-storage
+  namespace: streamflow
+  labels:
+    app.kubernetes.io/name: streamflow-storage
+    app.kubernetes.io/instance: streamflow
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/part-of: streamflow
+    app.kubernetes.io/managed-by: kubectl
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8004
+    targetPort: http
+    protocol: TCP
+    name: http
+  selector:
+    app.kubernetes.io/name: streamflow-storage
+    app.kubernetes.io/instance: streamflow
+
+---
+# Dashboard Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: streamflow-dashboard
+  namespace: streamflow
+  labels:
+    app.kubernetes.io/name: streamflow-dashboard
+    app.kubernetes.io/instance: streamflow
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/component: dashboard
+    app.kubernetes.io/part-of: streamflow
+    app.kubernetes.io/managed-by: kubectl
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8005
+    targetPort: http
+    protocol: TCP
+    name: http
+  selector:
+    app.kubernetes.io/name: streamflow-dashboard
+    app.kubernetes.io/instance: streamflow
+
+---
+# Web UI Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: streamflow-web-ui
+  namespace: streamflow
+  labels:
+    app.kubernetes.io/name: streamflow-web-ui
+    app.kubernetes.io/instance: streamflow
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/component: web-ui
+    app.kubernetes.io/part-of: streamflow
+    app.kubernetes.io/managed-by: kubectl
+spec:
+  type: ClusterIP
+  ports:
+  - port: 3000
+    targetPort: http
+    protocol: TCP
+    name: http
+  selector:
+    app.kubernetes.io/name: streamflow-web-ui
+    app.kubernetes.io/instance: streamflow
+
+---
+# Main LoadBalancer Service for external access
+apiVersion: v1
+kind: Service
+metadata:
+  name: streamflow-loadbalancer
+  namespace: streamflow
+  labels:
+    app.kubernetes.io/name: streamflow
+    app.kubernetes.io/instance: streamflow
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/component: loadbalancer
+    app.kubernetes.io/part-of: streamflow
+    app.kubernetes.io/managed-by: kubectl
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+    name: http
+  - port: 443
+    targetPort: 443
+    protocol: TCP
+    name: https
+  selector:
+    app.kubernetes.io/name: streamflow-nginx
+    app.kubernetes.io/instance: streamflow 

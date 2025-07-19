@@ -12,8 +12,13 @@ from typing import Dict, List, Optional, Callable, Any
 from uuid import UUID
 import json
 
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
+import uvicorn
+from sqlalchemy import text
+
 from streamflow.shared.config import get_settings
-from streamflow.shared.models import Event, EventType, MetricData, MetricType, ProcessingResult, ProcessingStatus
+from streamflow.shared.models import Event, EventType, MetricData, MetricType, ProcessingResult, ProcessingStatus, APIResponse, HealthCheck, HealthStatus
 from streamflow.shared.messaging import get_message_broker, get_event_publisher, MessageEnvelope
 from streamflow.shared.database import get_database_manager
 
@@ -21,6 +26,288 @@ logger = logging.getLogger(__name__)
 
 # Global state
 settings = get_settings()
+
+# Create FastAPI app
+app = FastAPI(
+    title="StreamFlow Analytics API",
+    description="Real-time analytics and insights API",
+    version="0.1.0"
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# Health check endpoint
+@app.get("/health", response_model=HealthCheck)
+async def health_check():
+    """Health check endpoint"""
+    try:
+        # Check database
+        db_manager = await get_database_manager()
+        db_health = await db_manager.health_check()
+        
+        overall_status = HealthStatus.HEALTHY if db_health["status"] == "healthy" else HealthStatus.UNHEALTHY
+        
+        return HealthCheck(
+            status=overall_status,
+            service="analytics",
+            version="0.1.0",
+            checks={
+                "database": db_health,
+                "stream_processor": "healthy" if 'analytics_service' in globals() and analytics_service.is_running else "not_running"
+            }
+        )
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        return HealthCheck(
+            status=HealthStatus.UNHEALTHY,
+            service="analytics",
+            version="0.1.0",
+            checks={"error": str(e)}
+        )
+
+
+@app.get("/api/v1/analytics/event-trends")
+async def get_event_trends(
+    hours: int = Query(default=24, ge=1, le=168, description="Number of hours to analyze"),
+    interval_minutes: int = Query(default=60, ge=5, le=1440, description="Time interval in minutes")
+):
+    """Get event trends over time with real data from storage"""
+    try:
+        db_manager = await get_database_manager()
+        
+        # Calculate time range
+        end_time = datetime.utcnow()
+        start_time = end_time - timedelta(hours=hours)
+        
+        # Create time intervals
+        intervals = []
+        current_time = start_time
+        while current_time < end_time:
+            intervals.append(current_time)
+            current_time += timedelta(minutes=interval_minutes)
+        
+        # Query events by intervals
+        event_trends = []
+        
+        async with db_manager.get_session() as session:
+            for i, interval_start in enumerate(intervals):
+                interval_end = interval_start + timedelta(minutes=interval_minutes)
+                
+                # Count events by type in this interval
+                result = await session.execute(
+                    text("""
+                    SELECT 
+                        type,
+                        COUNT(*) as count
+                    FROM events 
+                    WHERE timestamp >= :start AND timestamp < :end
+                    GROUP BY type
+                    """),
+                    {"start": interval_start, "end": interval_end}
+                )
+                
+                type_counts = dict(result.fetchall())
+                
+                # Format for chart
+                trend_point = {
+                    "time": interval_start.strftime("%H:%M"),
+                    "timestamp": interval_start.isoformat(),
+                    "webClicks": type_counts.get("web.click", 0) + type_counts.get("web.pageview", 0),
+                    "apiRequests": type_counts.get("api.request", 0) + type_counts.get("api.response", 0),
+                    "errors": type_counts.get("error", 0),
+                    "custom": type_counts.get("custom", 0),
+                    "total": sum(type_counts.values())
+                }
+                event_trends.append(trend_point)
+        
+        return APIResponse(
+            success=True,
+            message="Event trends retrieved successfully",
+            data=event_trends
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to get event trends: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get event trends")
+
+
+@app.get("/api/v1/analytics/user-distribution")
+async def get_user_distribution():
+    """Get user distribution by user agent/device type from real data"""
+    try:
+        db_manager = await get_database_manager()
+        
+        async with db_manager.get_session() as session:
+            # Query events with user agent data
+            result = await session.execute(
+                text("""
+                SELECT 
+                    data,
+                    COUNT(*) as count
+                FROM events 
+                WHERE data IS NOT NULL 
+                AND timestamp >= :start_time
+                """),
+                {"start_time": datetime.utcnow() - timedelta(days=7)}
+            )
+            
+            device_counts = {"Desktop": 0, "Mobile": 0, "Tablet": 0, "Unknown": 0}
+            total_count = 0
+            
+            for row in result.fetchall():
+                try:
+                    event_data = json.loads(row[0]) if isinstance(row[0], str) else row[0]
+                    user_agent = str(event_data.get("user_agent", "")).lower()
+                    count = row[1]
+                    total_count += count
+                    
+                    if any(mobile in user_agent for mobile in ["mobile", "android", "iphone"]):
+                        device_counts["Mobile"] += count
+                    elif any(tablet in user_agent for tablet in ["tablet", "ipad"]):
+                        device_counts["Tablet"] += count
+                    elif any(desktop in user_agent for desktop in ["chrome", "firefox", "safari", "edge"]):
+                        device_counts["Desktop"] += count
+                    else:
+                        device_counts["Unknown"] += count
+                        
+                except (json.JSONDecodeError, AttributeError):
+                    device_counts["Unknown"] += row[1]
+                    total_count += row[1]
+            
+            # Convert to percentages
+            if total_count > 0:
+                user_distribution = [
+                    {
+                        "name": device,
+                        "value": round((count / total_count) * 100, 1),
+                        "count": count,
+                        "color": {
+                            "Desktop": "#3b82f6",
+                            "Mobile": "#10b981", 
+                            "Tablet": "#f59e0b",
+                            "Unknown": "#6b7280"
+                        }[device]
+                    }
+                    for device, count in device_counts.items()
+                    if count > 0
+                ]
+            else:
+                # Default distribution if no data
+                user_distribution = [
+                    {"name": "Desktop", "value": 70, "count": 0, "color": "#3b82f6"},
+                    {"name": "Mobile", "value": 25, "count": 0, "color": "#10b981"},
+                    {"name": "Tablet", "value": 5, "count": 0, "color": "#f59e0b"}
+                ]
+        
+        return APIResponse(
+            success=True,
+            message="User distribution retrieved successfully",
+            data=user_distribution
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to get user distribution: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get user distribution")
+
+
+@app.get("/api/v1/analytics/top-sources")
+async def get_top_sources(limit: int = Query(default=10, ge=1, le=50)):
+    """Get top event sources from real data"""
+    try:
+        db_manager = await get_database_manager()
+        
+        async with db_manager.get_session() as session:
+            result = await session.execute(
+                text("""
+                SELECT 
+                    source,
+                    COUNT(*) as event_count,
+                    COUNT(DISTINCT user_id) as unique_users
+                FROM events 
+                WHERE timestamp >= :start_time
+                GROUP BY source 
+                ORDER BY event_count DESC 
+                LIMIT :limit
+                """),
+                {"start_time": datetime.utcnow() - timedelta(days=7), "limit": limit}
+            )
+            
+            top_sources = [
+                {
+                    "source": row[0],
+                    "event_count": row[1],
+                    "unique_users": row[2] or 0
+                }
+                for row in result.fetchall()
+            ]
+        
+        return APIResponse(
+            success=True,
+            message="Top sources retrieved successfully",
+            data=top_sources
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to get top sources: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get top sources")
+
+
+@app.get("/api/v1/analytics/event-types")
+async def get_event_types_distribution():
+    """Get event types distribution from real data"""
+    try:
+        db_manager = await get_database_manager()
+        
+        async with db_manager.get_session() as session:
+            result = await session.execute(
+                text("""
+                SELECT 
+                    type,
+                    COUNT(*) as count
+                FROM events 
+                WHERE timestamp >= :start_time
+                GROUP BY type 
+                ORDER BY count DESC
+                """),
+                {"start_time": datetime.utcnow() - timedelta(days=7)}
+            )
+            
+            event_types = [
+                {
+                    "type": row[0].replace(".", " ").replace("_", " ").title(),
+                    "count": row[1],
+                    "color": {
+                        "web.click": "#3b82f6",
+                        "web.pageview": "#10b981",
+                        "api.request": "#8b5cf6",
+                        "api.response": "#a855f7",
+                        "error": "#ef4444",
+                        "custom": "#f59e0b",
+                        "user.login": "#06b6d4",
+                        "user.logout": "#84cc16",
+                        "metric": "#f97316"
+                    }.get(row[0], "#6b7280")
+                }
+                for row in result.fetchall()
+            ]
+        
+        return APIResponse(
+            success=True,
+            message="Event types distribution retrieved successfully",
+            data=event_types
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to get event types distribution: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get event types distribution")
 
 
 class TimeWindow:
@@ -362,14 +649,31 @@ class AnalyticsService:
 analytics_service = AnalyticsService()
 
 
+async def start_analytics_service():
+    """Start the analytics processing service"""
+    await analytics_service.start()
+
+
 async def main():
     """Main function to run analytics service"""
     try:
-        await analytics_service.start()
+        # Start analytics processing in background
+        analytics_task = asyncio.create_task(start_analytics_service())
         
-        # Keep service running
-        while analytics_service.is_running:
-            await asyncio.sleep(1)
+        # Start FastAPI server
+        config = uvicorn.Config(
+            app, 
+            host="0.0.0.0", 
+            port=settings.services.analytics_port,
+            log_level="info"
+        )
+        server = uvicorn.Server(config)
+        
+        # Run both services concurrently
+        await asyncio.gather(
+            server.serve(),
+            analytics_task
+        )
             
     except KeyboardInterrupt:
         logger.info("Received shutdown signal")

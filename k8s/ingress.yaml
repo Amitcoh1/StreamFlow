@@ -1,0 +1,261 @@
+---
+# Ingress Controller for StreamFlow
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: streamflow-ingress
+  namespace: streamflow
+  labels:
+    app.kubernetes.io/name: streamflow
+    app.kubernetes.io/instance: streamflow
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/part-of: streamflow
+    app.kubernetes.io/managed-by: kubectl
+  annotations:
+    # Ingress controller annotations
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    
+    # SSL/TLS configuration
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-protocols: "TLSv1.2 TLSv1.3"
+    nginx.ingress.kubernetes.io/ssl-ciphers: "ECDHE-RSA-AES128-GCM-SHA256,ECDHE-RSA-AES256-GCM-SHA384,ECDHE-RSA-AES128-SHA,ECDHE-RSA-AES256-SHA,ECDHE-RSA-AES128-SHA256,ECDHE-RSA-AES256-SHA384"
+    
+    # Security headers
+    nginx.ingress.kubernetes.io/server-snippet: |
+      add_header X-Frame-Options "SAMEORIGIN" always;
+      add_header X-Content-Type-Options "nosniff" always;
+      add_header X-XSS-Protection "1; mode=block" always;
+      add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+      add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'self';" always;
+    
+    # Rate limiting
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    
+    # Compression
+    nginx.ingress.kubernetes.io/enable-compression: "true"
+    nginx.ingress.kubernetes.io/compression-types: "text/plain,text/css,application/json,application/javascript,text/xml,application/xml,application/xml+rss,text/javascript"
+    
+    # Proxy settings
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    
+    # WebSocket support
+    nginx.ingress.kubernetes.io/websocket-services: "streamflow-dashboard"
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    
+    # CORS configuration
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://streamflow.local,http://localhost:3000"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization"
+
+spec:
+  tls:
+  - hosts:
+    - streamflow.local
+    - api.streamflow.local
+    secretName: streamflow-tls-secret
+  
+  rules:
+  # Main application domain
+  - host: streamflow.local
+    http:
+      paths:
+      # API routes
+      - path: /api/v1/events
+        pathType: Prefix
+        backend:
+          service:
+            name: streamflow-storage
+            port:
+              number: 8004
+      
+      - path: /api/v1/stats
+        pathType: Prefix
+        backend:
+          service:
+            name: streamflow-dashboard
+            port:
+              number: 8005
+      
+      - path: /api/v1/analytics
+        pathType: Prefix
+        backend:
+          service:
+            name: streamflow-analytics
+            port:
+              number: 8002
+      
+      - path: /api/v1/alerts
+        pathType: Prefix
+        backend:
+          service:
+            name: streamflow-alerting
+            port:
+              number: 8003
+      
+      - path: /api/v1/ingest
+        pathType: Prefix
+        backend:
+          service:
+            name: streamflow-ingestion
+            port:
+              number: 8001
+      
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: streamflow-dashboard
+            port:
+              number: 8005
+      
+      # WebSocket endpoints
+      - path: /ws
+        pathType: Prefix
+        backend:
+          service:
+            name: streamflow-dashboard
+            port:
+              number: 8005
+      
+      # Health check endpoints
+      - path: /health
+        pathType: Exact
+        backend:
+          service:
+            name: streamflow-dashboard
+            port:
+              number: 8005
+      
+      - path: /ready
+        pathType: Exact
+        backend:
+          service:
+            name: streamflow-dashboard
+            port:
+              number: 8005
+      
+      # Metrics endpoint
+      - path: /metrics
+        pathType: Exact
+        backend:
+          service:
+            name: streamflow-dashboard
+            port:
+              number: 8005
+      
+      # Default route - Web UI (must be last)
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: streamflow-web-ui
+            port:
+              number: 3000
+
+  # API subdomain
+  - host: api.streamflow.local
+    http:
+      paths:
+      # Direct API access
+      - path: /v1/events
+        pathType: Prefix
+        backend:
+          service:
+            name: streamflow-storage
+            port:
+              number: 8004
+      
+      - path: /v1/stats
+        pathType: Prefix
+        backend:
+          service:
+            name: streamflow-dashboard
+            port:
+              number: 8005
+      
+      - path: /v1/analytics
+        pathType: Prefix
+        backend:
+          service:
+            name: streamflow-analytics
+            port:
+              number: 8002
+      
+      - path: /v1/alerts
+        pathType: Prefix
+        backend:
+          service:
+            name: streamflow-alerting
+            port:
+              number: 8003
+      
+      - path: /v1/ingest
+        pathType: Prefix
+        backend:
+          service:
+            name: streamflow-ingestion
+            port:
+              number: 8001
+      
+      # Default API route
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: streamflow-dashboard
+            port:
+              number: 8005
+
+---
+# Certificate for TLS
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: streamflow-tls-cert
+  namespace: streamflow
+  labels:
+    app.kubernetes.io/name: streamflow
+    app.kubernetes.io/instance: streamflow
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/component: certificate
+    app.kubernetes.io/part-of: streamflow
+    app.kubernetes.io/managed-by: kubectl
+spec:
+  secretName: streamflow-tls-secret
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+  - streamflow.local
+  - api.streamflow.local
+
+---
+# Let's Encrypt ClusterIssuer
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+  labels:
+    app.kubernetes.io/name: streamflow
+    app.kubernetes.io/instance: streamflow
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/component: cert-issuer
+    app.kubernetes.io/part-of: streamflow
+    app.kubernetes.io/managed-by: kubectl
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: admin@streamflow.local  # Change this to your email
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    solvers:
+    - http01:
+        ingress:
+          class: nginx 

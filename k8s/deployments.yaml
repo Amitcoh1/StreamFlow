@@ -1,0 +1,515 @@
+---
+# Ingestion Service Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: streamflow-ingestion
+  namespace: streamflow
+  labels:
+    app.kubernetes.io/name: streamflow-ingestion
+    app.kubernetes.io/instance: streamflow
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/component: ingestion
+    app.kubernetes.io/part-of: streamflow
+    app.kubernetes.io/managed-by: kubectl
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: streamflow-ingestion
+      app.kubernetes.io/instance: streamflow
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: streamflow-ingestion
+        app.kubernetes.io/instance: streamflow
+        app.kubernetes.io/version: "0.1.0"
+        app.kubernetes.io/component: ingestion
+        app.kubernetes.io/part-of: streamflow
+    spec:
+      serviceAccountName: streamflow
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 3000
+        fsGroup: 2000
+      containers:
+      - name: ingestion
+        image: streamflow/ingestion:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8001
+          protocol: TCP
+        env:
+        - name: PORT
+          value: "8001"
+        envFrom:
+        - configMapRef:
+            name: streamflow-config
+        - secretRef:
+            name: streamflow-secrets
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 6
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+
+---
+# Analytics Service Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: streamflow-analytics
+  namespace: streamflow
+  labels:
+    app.kubernetes.io/name: streamflow-analytics
+    app.kubernetes.io/instance: streamflow
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/component: analytics
+    app.kubernetes.io/part-of: streamflow
+    app.kubernetes.io/managed-by: kubectl
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: streamflow-analytics
+      app.kubernetes.io/instance: streamflow
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: streamflow-analytics
+        app.kubernetes.io/instance: streamflow
+        app.kubernetes.io/version: "0.1.0"
+        app.kubernetes.io/component: analytics
+        app.kubernetes.io/part-of: streamflow
+    spec:
+      serviceAccountName: streamflow
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 3000
+        fsGroup: 2000
+      containers:
+      - name: analytics
+        image: streamflow/analytics:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8002
+          protocol: TCP
+        env:
+        - name: PORT
+          value: "8002"
+        envFrom:
+        - configMapRef:
+            name: streamflow-config
+        - secretRef:
+            name: streamflow-secrets
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 6
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+
+---
+# Alerting Service Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: streamflow-alerting
+  namespace: streamflow
+  labels:
+    app.kubernetes.io/name: streamflow-alerting
+    app.kubernetes.io/instance: streamflow
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/component: alerting
+    app.kubernetes.io/part-of: streamflow
+    app.kubernetes.io/managed-by: kubectl
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: streamflow-alerting
+      app.kubernetes.io/instance: streamflow
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: streamflow-alerting
+        app.kubernetes.io/instance: streamflow
+        app.kubernetes.io/version: "0.1.0"
+        app.kubernetes.io/component: alerting
+        app.kubernetes.io/part-of: streamflow
+    spec:
+      serviceAccountName: streamflow
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 3000
+        fsGroup: 2000
+      containers:
+      - name: alerting
+        image: streamflow/alerting:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8003
+          protocol: TCP
+        env:
+        - name: PORT
+          value: "8003"
+        envFrom:
+        - configMapRef:
+            name: streamflow-config
+        - secretRef:
+            name: streamflow-secrets
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 6
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+
+---
+# Storage Service Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: streamflow-storage
+  namespace: streamflow
+  labels:
+    app.kubernetes.io/name: streamflow-storage
+    app.kubernetes.io/instance: streamflow
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/part-of: streamflow
+    app.kubernetes.io/managed-by: kubectl
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: streamflow-storage
+      app.kubernetes.io/instance: streamflow
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: streamflow-storage
+        app.kubernetes.io/instance: streamflow
+        app.kubernetes.io/version: "0.1.0"
+        app.kubernetes.io/component: storage
+        app.kubernetes.io/part-of: streamflow
+    spec:
+      serviceAccountName: streamflow
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 3000
+        fsGroup: 2000
+      containers:
+      - name: storage
+        image: streamflow/storage:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8004
+          protocol: TCP
+        env:
+        - name: PORT
+          value: "8004"
+        envFrom:
+        - configMapRef:
+            name: streamflow-config
+        - secretRef:
+            name: streamflow-secrets
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 6
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+
+---
+# Dashboard Service Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: streamflow-dashboard
+  namespace: streamflow
+  labels:
+    app.kubernetes.io/name: streamflow-dashboard
+    app.kubernetes.io/instance: streamflow
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/component: dashboard
+    app.kubernetes.io/part-of: streamflow
+    app.kubernetes.io/managed-by: kubectl
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: streamflow-dashboard
+      app.kubernetes.io/instance: streamflow
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: streamflow-dashboard
+        app.kubernetes.io/instance: streamflow
+        app.kubernetes.io/version: "0.1.0"
+        app.kubernetes.io/component: dashboard
+        app.kubernetes.io/part-of: streamflow
+    spec:
+      serviceAccountName: streamflow
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 3000
+        fsGroup: 2000
+      containers:
+      - name: dashboard
+        image: streamflow/dashboard:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8005
+          protocol: TCP
+        env:
+        - name: PORT
+          value: "8005"
+        envFrom:
+        - configMapRef:
+            name: streamflow-config
+        - secretRef:
+            name: streamflow-secrets
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 6
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+
+---
+# Web UI Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: streamflow-web-ui
+  namespace: streamflow
+  labels:
+    app.kubernetes.io/name: streamflow-web-ui
+    app.kubernetes.io/instance: streamflow
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/component: web-ui
+    app.kubernetes.io/part-of: streamflow
+    app.kubernetes.io/managed-by: kubectl
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: streamflow-web-ui
+      app.kubernetes.io/instance: streamflow
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: streamflow-web-ui
+        app.kubernetes.io/instance: streamflow
+        app.kubernetes.io/version: "0.1.0"
+        app.kubernetes.io/component: web-ui
+        app.kubernetes.io/part-of: streamflow
+    spec:
+      serviceAccountName: streamflow
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 3000
+        fsGroup: 2000
+      containers:
+      - name: web-ui
+        image: streamflow/web-ui:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 3000
+          protocol: TCP
+        env:
+        - name: PORT
+          value: "3000"
+        - name: REACT_APP_API_URL
+          value: "/api"
+        envFrom:
+        - configMapRef:
+            name: streamflow-config
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+        livenessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 6
+        readinessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false  # React app needs to write to tmp
+          capabilities:
+            drop:
+            - ALL 
