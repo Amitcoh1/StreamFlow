@@ -999,3 +999,83 @@ kubectl delete mutatingwebhookconfiguration streamflow-webhook
 **Perfect for GitOps workflows** - Deploy your apps normally, StreamFlow monitoring gets added automatically! 🎯
 
 ---
+
+## ⌨️ **Kubectl Autocompletion & Aliases** *(Developer Experience)*
+
+StreamFlow includes a comprehensive kubectl autocompletion setup with StreamFlow-specific aliases and functions.
+
+### 🚀 **One-Command Setup:**
+
+```bash
+# Auto-detects your shell and sets up everything
+./scripts/setup-k8s-completion.sh
+
+# Or use the StreamFlow CLI
+python cli.py setup-completion
+```
+
+### 📋 **What Gets Added:**
+
+**Basic kubectl aliases:**
+```bash
+k       # kubectl
+kgp     # kubectl get pods  
+kgs     # kubectl get services
+kgd     # kubectl get deployments
+kga     # kubectl get all
+kl      # kubectl logs
+klf     # kubectl logs -f
+ke      # kubectl exec -it
+```
+
+**StreamFlow-specific aliases:**
+```bash
+ksf     # kubectl get pods -l streamflow.io/managed=true
+ksfl    # kubectl logs -l streamflow.io/managed=true  
+ksfm    # kubectl get pods -l streamflow.io/component=microservice
+kwh     # kubectl get mutatingwebhookconfigurations
+kwhl    # kubectl logs -n streamflow-webhook -l app=streamflow-webhook
+```
+
+**Helper functions:**
+```bash
+kns <namespace>    # Switch namespace
+kctx <context>     # Switch cluster context
+ksf-pods          # List all StreamFlow managed pods
+ksf-logs          # Show StreamFlow service logs
+ksf-restart       # Restart all StreamFlow deployments
+```
+
+### 🧪 **Test Autocompletion:**
+
+```bash
+# After setup, try these (press TAB):
+k get p<TAB>           # Completes to 'pods'
+k describe po<TAB>     # Completes to 'pod'
+k logs <TAB>           # Shows available pods
+ksf<TAB>              # Shows StreamFlow aliases
+```
+
+### 🔄 **Manual Setup (Alternative):**
+
+If you prefer manual setup:
+
+**Bash:**
+```bash
+echo 'source <(kubectl completion bash)' >> ~/.bashrc
+echo 'alias k=kubectl' >> ~/.bashrc
+echo 'complete -F __start_kubectl k' >> ~/.bashrc
+source ~/.bashrc
+```
+
+**Zsh:**
+```bash
+echo 'source <(kubectl completion zsh)' >> ~/.zshrc
+echo 'alias k=kubectl' >> ~/.zshrc
+echo 'compdef __start_kubectl k' >> ~/.zshrc
+source ~/.zshrc
+```
+
+**Perfect for daily Kubernetes workflows with StreamFlow!** ⚡
+
+---

@@ -259,6 +259,69 @@ def cli():
 
 
 @cli.command()
+@click.option('--shell', type=click.Choice(['bash', 'zsh', 'fish', 'powershell']), 
+              help='Shell type for completion')
+def setup_completion(shell):
+    """Setup kubectl and StreamFlow CLI autocompletion"""
+    
+    if not shell:
+        # Auto-detect shell
+        shell_env = os.environ.get('SHELL', '')
+        if 'zsh' in shell_env:
+            shell = 'zsh'
+        elif 'fish' in shell_env:
+            shell = 'fish'
+        else:
+            shell = 'bash'
+    
+    click.echo(f"🚀 Setting up autocompletion for {shell}...")
+    
+    # kubectl completion setup
+    kubectl_commands = {
+        'bash': [
+            'echo "source <(kubectl completion bash)" >> ~/.bashrc',
+            'echo "alias k=kubectl" >> ~/.bashrc', 
+            'echo "complete -F __start_kubectl k" >> ~/.bashrc'
+        ],
+        'zsh': [
+            'echo "source <(kubectl completion zsh)" >> ~/.zshrc',
+            'echo "alias k=kubectl" >> ~/.zshrc',
+            'echo "compdef __start_kubectl k" >> ~/.zshrc'
+        ],
+        'fish': [
+            'mkdir -p ~/.config/fish',
+            'echo "kubectl completion fish | source" >> ~/.config/fish/config.fish'
+        ],
+        'powershell': [
+            'kubectl completion powershell >> $PROFILE'
+        ]
+    }
+    
+    try:
+        for cmd in kubectl_commands[shell]:
+            subprocess.run(cmd, shell=True, check=True)
+        
+        click.echo("✅ kubectl autocompletion configured!")
+        click.echo(f"📋 Restart your {shell} shell or run:")
+        
+        reload_commands = {
+            'bash': 'source ~/.bashrc',
+            'zsh': 'source ~/.zshrc', 
+            'fish': 'source ~/.config/fish/config.fish',
+            'powershell': '. $PROFILE'
+        }
+        
+        click.echo(f"   {reload_commands[shell]}")
+        
+        # StreamFlow CLI completion
+        click.echo("\n🔧 For StreamFlow CLI completion, add this to your shell config:")
+        click.echo(f"   eval \"$(_STREAMFLOW_COMPLETE={shell}_source streamflow)\"")
+        
+    except subprocess.CalledProcessError as e:
+        click.echo(f"❌ Error setting up completion: {e}")
+
+
+@cli.command()
 @click.argument("project_name")
 @click.option("--template", default="basic", help="Project template (basic, advanced, enterprise)")
 def init(project_name: str, template: str):
