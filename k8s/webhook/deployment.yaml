@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: streamflow-webhook
+  namespace: streamflow-webhook
+  labels:
+    app: streamflow-webhook
+    streamflow.io/component: webhook
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: streamflow-webhook
+  template:
+    metadata:
+      labels:
+        app: streamflow-webhook
+        streamflow.io/component: webhook
+    spec:
+      serviceAccountName: streamflow-webhook
+      containers:
+      - name: webhook
+        image: streamflow-webhook:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8443
+          name: webhook
+          protocol: TCP
+        env:
+        - name: WEBHOOK_PORT
+          value: "8443"
+        - name: WEBHOOK_CERT_DIR
+          value: "/etc/certs"
+        volumeMounts:
+        - name: certs
+          mountPath: /etc/certs
+          readOnly: true
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8443
+            scheme: HTTPS
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8443
+            scheme: HTTPS
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1001
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: certs
+        secret:
+          secretName: webhook-certs
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001 

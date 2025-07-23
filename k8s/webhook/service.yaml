@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: streamflow-webhook
+  namespace: streamflow-webhook
+  labels:
+    app: streamflow-webhook
+    streamflow.io/component: webhook
+spec:
+  selector:
+    app: streamflow-webhook
+  ports:
+  - name: webhook
+    port: 443
+    targetPort: 8443
+    protocol: TCP
+  type: ClusterIP 

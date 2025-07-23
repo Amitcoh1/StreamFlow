@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: streamflow-webhook
+  labels:
+    name: streamflow-webhook
+    streamflow.io/component: webhook
+    streamflow.io/webhook: disabled  # Disable webhook for its own namespace 

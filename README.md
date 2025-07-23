@@ -940,3 +940,62 @@ streamflow/services/[service_name]/
 ---
 
 *Ready to build the future of real-time analytics? Pick a feature and start coding! 🚀*
+
+## 🔗 **Kubernetes Mutating Webhook** *(New Feature)*
+
+StreamFlow includes a **Kubernetes mutating webhook** that automatically enhances deployed services with monitoring capabilities.
+
+### ✨ **What it does:**
+
+**Automatic Enhancement** - When you deploy any service to Kubernetes, the webhook automatically:
+- ✅ Adds StreamFlow monitoring annotations
+- ✅ Injects metrics and health check paths  
+- ✅ Adds service discovery labels
+- ✅ Timestamps injection for tracking
+
+### 🚀 **Quick Setup:**
+
+```bash
+# Generate certificates and deploy webhook
+./scripts/deploy-webhook.sh
+
+# Test it - deploy any app and see automatic enhancement
+kubectl create deployment test-app --image=nginx
+kubectl get deployment test-app -o yaml | grep streamflow
+```
+
+### 📋 **Webhook Annotations Added:**
+
+```yaml
+metadata:
+  annotations:
+    streamflow.io/monitoring: "enabled"
+    streamflow.io/metrics-path: "/metrics"
+    streamflow.io/metrics-port: "8080"
+    streamflow.io/health-path: "/health"
+    streamflow.io/version: "1.0.0"
+    streamflow.io/injected-at: "2025-01-19T10:30:45"
+  labels:
+    streamflow.io/managed: "true"
+    streamflow.io/component: "microservice"
+```
+
+### 🛡️ **Smart Filtering:**
+- ✅ Only processes Deployments and Services
+- ✅ Skips system namespaces (kube-system, etc.)
+- ✅ Avoids double-injection
+- ✅ Respects namespace-level disable flags
+
+### 🎛️ **Control Options:**
+
+```bash
+# Disable webhook for specific namespace
+kubectl label namespace my-namespace streamflow.io/webhook=disabled
+
+# Remove webhook completely  
+kubectl delete mutatingwebhookconfiguration streamflow-webhook
+```
+
+**Perfect for GitOps workflows** - Deploy your apps normally, StreamFlow monitoring gets added automatically! 🎯
+
+---

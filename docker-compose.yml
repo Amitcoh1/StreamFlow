@@ -259,6 +259,29 @@ services:
       - streamflow-network
     restart: unless-stopped
 
+  webhook:
+    build:
+      context: .
+      dockerfile: docker/webhook/Dockerfile
+    container_name: streamflow-webhook
+    ports:
+      - "8443:8443"
+    volumes:
+      - ./webhook-certs:/etc/certs:ro
+    environment:
+      - WEBHOOK_PORT=8443
+      - WEBHOOK_CERT_DIR=/etc/certs
+    networks:
+      - streamflow-network
+    depends_on:
+      - postgres
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-k", "https://localhost:8443/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
 volumes:
   rabbitmq_data:
   postgres_data:
