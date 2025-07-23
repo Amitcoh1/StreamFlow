@@ -261,7 +261,7 @@ def main():
     logger.info(f"Using certificates from {cert_dir}")
     
     uvicorn.run(
-        "streamflow.services.webhook.main:app",
+        app,  # Use the app object directly instead of module string
         host="0.0.0.0",
         port=port,
         ssl_keyfile=ssl_keyfile,

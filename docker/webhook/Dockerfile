@@ -22,6 +22,10 @@ COPY requirements.txt .
 # Install StreamFlow in development mode
 RUN pip install -e .
 
+# Copy entrypoint script
+COPY docker/webhook/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 # Create non-root user
 RUN useradd -m -u 1001 webhook && chown -R webhook:webhook /app
 
@@ -37,5 +41,5 @@ EXPOSE 8443
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f -k https://localhost:8443/health || exit 1
 
-# Run the webhook service
-CMD ["python", "-m", "streamflow.services.webhook.main"] 
+# Run the webhook service using entrypoint script
+ENTRYPOINT ["/entrypoint.sh"] 

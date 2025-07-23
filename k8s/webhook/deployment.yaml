@@ -21,7 +21,7 @@ spec:
       containers:
       - name: webhook
         image: streamflow-webhook:latest
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Never  # Force using local image in minikube
         ports:
         - containerPort: 8443
           name: webhook
