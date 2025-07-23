@@ -113,8 +113,12 @@ class DatabaseManager:
     async def health_check(self) -> Dict[str, Any]:
         """Database health check"""
         try:
+            if not self.engine:
+                await self.initialize()
+                
             async with self.get_session() as session:
                 await session.execute(select(1))
+                
                 return {
                     "status": "healthy",
                     "database": "postgresql",
@@ -122,8 +126,8 @@ class DatabaseManager:
                         "size": self.engine.pool.size(),
                         "checked_in": self.engine.pool.checkedin(),
                         "checked_out": self.engine.pool.checkedout(),
-                        "overflow": self.engine.pool.overflow(),
-                        "invalid": self.engine.pool.invalid()
+                        "overflow": self.engine.pool.overflow()
+                        # Note: invalid() method doesn't exist in SQLAlchemy 2.0
                     }
                 }
         except Exception as e:

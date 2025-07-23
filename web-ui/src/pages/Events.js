@@ -17,7 +17,7 @@ const Events = () => {
   const [expandedRows, setExpandedRows] = useState(new Set());
 
   // Calculate date range for filtering
-  const getDateRange = () => {
+  const getDateRange = useCallback(() => {
     const endDate = new Date();
     let startDate;
     
@@ -39,7 +39,7 @@ const Events = () => {
     }
     
     return { startDate, endDate };
-  };
+  }, [dateFilter]);
 
   // Fetch events from API with pagination and filtering
   const fetchEvents = useCallback(async (page = 1) => {
@@ -61,7 +61,10 @@ const Events = () => {
         params.event_type = selectedType;
       }
       
-      const response = await axios.get('/api/v1/events', { params });
+      const response = await axios.get('http://localhost:8004/api/v1/events', { 
+        params,
+        headers: { Authorization: 'Bearer demo' }
+      });
       
       if (Array.isArray(response.data)) {
         // Direct array response from storage service
@@ -101,22 +104,12 @@ const Events = () => {
     } finally {
       setLoading(false);
     }
-  }, [eventsPerPage, selectedType, dateFilter]);
+  }, [eventsPerPage, selectedType, getDateRange]);
 
   useEffect(() => {
     setCurrentPage(1); // Reset to first page when filters change
     fetchEvents(1);
   }, [fetchEvents]);
-
-  useEffect(() => {
-    // Auto-refresh every 60 seconds for live data
-    const interval = setInterval(() => {
-      if (currentPage === 1) { // Only auto-refresh if on first page
-        fetchEvents(currentPage);
-      }
-    }, 60000);
-    return () => clearInterval(interval);
-  }, [fetchEvents, currentPage]);
 
   useEffect(() => {
     let filtered = events;

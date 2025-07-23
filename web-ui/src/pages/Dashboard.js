@@ -27,13 +27,21 @@ const Dashboard = () => {
       // Fetch data from multiple services in parallel
       const [dashboardRes, analyticsEventsRes, analyticsSourcesRes, alertsRes] = await Promise.all([
         // Dashboard service stats
-        axios.get('/api/v1/stats'),
+        axios.get('http://localhost:8004/api/v1/stats', {
+          headers: { Authorization: 'Bearer demo' }
+        }),
         // Analytics service for event trends  
-        axios.get('http://localhost:8002/api/v1/analytics/event-trends?hours=24&interval_minutes=240'),
+        axios.get('http://localhost:8002/api/v1/analytics/event-trends?hours=24&interval_minutes=240', {
+          headers: { Authorization: 'Bearer demo' }
+        }),
         // Analytics service for top sources
-        axios.get('http://localhost:8002/api/v1/analytics/top-sources?limit=5'),
+        axios.get('http://localhost:8002/api/v1/analytics/top-sources?limit=5', {
+          headers: { Authorization: 'Bearer demo' }
+        }),
         // Alerting service for alert stats
-        axios.get('http://localhost:8003/api/v1/alerts/stats')
+        axios.get('http://localhost:8003/api/v1/alerts/stats', {
+          headers: { Authorization: 'Bearer demo' }
+        })
       ]);
 
       // Process dashboard stats
@@ -82,7 +90,7 @@ const Dashboard = () => {
           type: level.charAt(0).toUpperCase() + level.slice(1),
           count: count,
           color: {
-            'critical': '#ef4444',
+            'critical': '#dc2626',
             'high': '#f97316', 
             'medium': '#eab308',
             'low': '#3b82f6'
@@ -117,10 +125,10 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchMetrics();
-    // Update metrics every 30 seconds
-    const interval = setInterval(fetchMetrics, 30000);
-    return () => clearInterval(interval);
-  }, [fetchMetrics]);
+    // Remove auto-refresh to prevent infinite loops
+    // const interval = setInterval(fetchMetrics, 30000);
+    // return () => clearInterval(interval);
+  }, []);
 
   const StatCard = ({ title, value, icon: Icon, color, change }) => (
     <div className="bg-white rounded-lg shadow p-6">

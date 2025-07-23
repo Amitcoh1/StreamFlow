@@ -19,8 +19,12 @@ const Alerts = () => {
 
       // Fetch from alerting service (port 8003)
       const [alertsRes, statsRes] = await Promise.all([
-        axios.get(`http://localhost:8003/api/v1/alerts?limit=100&hours=24${statusFilter !== 'all' ? `&status=${statusFilter}` : ''}`),
-        axios.get('http://localhost:8003/api/v1/alerts/stats')
+        axios.get(`http://localhost:8003/api/v1/alerts?limit=100&hours=24${statusFilter !== 'all' ? `&status=${statusFilter}` : ''}`, {
+          headers: { Authorization: 'Bearer demo' }
+        }),
+        axios.get('http://localhost:8003/api/v1/alerts/stats', {
+          headers: { Authorization: 'Bearer demo' }
+        })
       ]);
 
       if (alertsRes.data.success) {
@@ -56,14 +60,16 @@ const Alerts = () => {
   useEffect(() => {
     fetchAlertsData();
     
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(fetchAlertsData, 30 * 1000);
-    return () => clearInterval(interval);
-  }, [fetchAlertsData]);
+    // Remove auto-refresh to prevent infinite loops
+    // const interval = setInterval(fetchAlertsData, 30 * 1000);
+    // return () => clearInterval(interval);
+  }, []);
 
   const acknowledgeAlert = async (alertId) => {
     try {
-      await axios.post(`http://localhost:8003/api/v1/alerts/${alertId}/acknowledge`);
+      await axios.post(`http://localhost:8003/api/v1/alerts/${alertId}/acknowledge`, {}, {
+        headers: { Authorization: 'Bearer demo' }
+      });
       
       // Update local state
       setAlerts(alerts.map(alert => 
@@ -83,7 +89,9 @@ const Alerts = () => {
 
   const resolveAlert = async (alertId) => {
     try {
-      await axios.post(`http://localhost:8003/api/v1/alerts/${alertId}/resolve`);
+      await axios.post(`http://localhost:8003/api/v1/alerts/${alertId}/resolve`, {}, {
+        headers: { Authorization: 'Bearer demo' }
+      });
       
       // Update local state
       setAlerts(alerts.map(alert => 

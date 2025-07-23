@@ -7,21 +7,34 @@ StreamFlow - real-time analytics pipeline
 import asyncio
 import logging
 from abc import ABC, abstractmethod
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any, Union
 from enum import Enum
 from dataclasses import dataclass, field
 from uuid import UUID, uuid4
 
+from fastapi import FastAPI, HTTPException, Depends, Query
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
+import uvicorn
+from sqlalchemy import text
+
 from streamflow.shared.config import get_settings
 from streamflow.shared.models import (
     Event, AlertRule, Alert, AlertLevel, AlertChannel, 
-    MessageEnvelope, HealthCheck, HealthStatus
+    MessageEnvelope, HealthCheck, HealthStatus, APIResponse
 )
 from streamflow.shared.messaging import get_message_broker, get_event_publisher
 from streamflow.shared.database import get_database_manager
 
 logger = logging.getLogger(__name__)
+
+# Global state
+settings = get_settings()
+security = HTTPBearer()
 
 
 class AlertState(Enum):
@@ -551,6 +564,316 @@ class AlertEngine:
 alert_engine = AlertEngine()
 
 
+async def authenticate_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Authenticate user"""
+    if not credentials.credentials:
+        raise HTTPException(status_code=401, detail="Invalid authentication credentials")
+    return {"user_id": "authenticated_user"}
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan events"""
+    # Startup
+    logger.info("Starting Alerting API Service...")
+    
+    # Initialize database
+    db_manager = await get_database_manager()
+    await db_manager.create_tables()
+    
+    # Start alert engine in background
+    asyncio.create_task(alert_engine.start())
+    
+    logger.info("Alerting API Service started successfully")
+    
+    yield
+    
+    # Shutdown
+    logger.info("Shutting down Alerting API Service...")
+    await alert_engine.stop()
+    await db_manager.close()
+    logger.info("Alerting API Service stopped")
+
+
+# Create FastAPI app
+app = FastAPI(
+    title="StreamFlow Alerting API",
+    description="Real-time alerting and notification API",
+    version="0.1.0",
+    lifespan=lifespan
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# Health check endpoints
+@app.get("/health", response_model=HealthCheck)
+async def health_check():
+    """Health check endpoint"""
+    try:
+        # Check database
+        db_manager = await get_database_manager()
+        db_health = await db_manager.health_check()
+        
+        # Check message broker
+        broker = await get_message_broker()
+        broker_health = {"status": "healthy" if broker.is_connected else "unhealthy"}
+        
+        overall_status = HealthStatus.HEALTHY
+        if db_health["status"] != "healthy" or broker_health["status"] != "healthy":
+            overall_status = HealthStatus.UNHEALTHY
+        
+        return HealthCheck(
+            status=overall_status,
+            service="alerting",
+            version="0.1.0",
+            checks={
+                "database": db_health,
+                "message_broker": broker_health,
+                "alert_engine": "running" if alert_engine.is_running else "stopped"
+            }
+        )
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        return HealthCheck(
+            status=HealthStatus.UNHEALTHY,
+            service="alerting",
+            version="0.1.0",
+            checks={"error": str(e)}
+        )
+
+
+@app.get("/ready")
+async def readiness_check():
+    """Readiness check endpoint"""
+    return {"status": "ready", "service": "alerting"}
+
+
+# Alert endpoints
+@app.get("/api/v1/alerts")
+async def get_alerts(
+    status: Optional[str] = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    user=Depends(authenticate_user)
+):
+    """Get alerts with optional status filtering"""
+    
+    try:
+        db_manager = await get_database_manager()
+        
+        async with db_manager.get_session() as session:
+            # Build query
+            where_clause = ""
+            params = {"limit": limit, "offset": offset}
+            
+            if status:
+                where_clause = "WHERE status = :status"
+                params["status"] = status
+            
+            query = text(f"""
+                SELECT 
+                    id, message, level, status, source, 
+                    created_at, updated_at, data
+                FROM alerts 
+                {where_clause}
+                ORDER BY created_at DESC
+                LIMIT :limit OFFSET :offset
+            """)
+            
+            result = await session.execute(query, params)
+            
+            alerts = []
+            for row in result:
+                alerts.append({
+                    "id": str(row.id),
+                    "message": row.message,
+                    "level": row.level,
+                    "status": row.status,
+                    "source": row.source,
+                    "created_at": row.created_at.isoformat() if row.created_at else None,
+                    "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+                    "data": row.data
+                })
+        
+        return APIResponse(
+            success=True,
+            message="Alerts retrieved successfully",
+            data=alerts
+        )
+    except Exception as e:
+        logger.error(f"Failed to get alerts: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get alerts")
+
+
+@app.get("/api/v1/alerts/stats")
+async def get_alert_stats(user=Depends(authenticate_user)):
+    """Get alert statistics"""
+    
+    try:
+        db_manager = await get_database_manager()
+        
+        async with db_manager.get_session() as session:
+            # Check if alerts table exists and has data
+            try:
+                count_query = text("SELECT COUNT(*) as total FROM alerts")
+                count_result = await session.execute(count_query)
+                total_alerts = count_result.scalar()
+                
+                if total_alerts == 0:
+                    # Return empty stats if no alerts exist
+                    return APIResponse(
+                        success=True,
+                        message="Alert statistics retrieved successfully",
+                        data={
+                            "total": 0,
+                            "by_status": {},
+                            "by_level": {},
+                            "recent_24h": 0
+                        }
+                    )
+            except Exception:
+                # Table might not exist yet, return empty stats
+                return APIResponse(
+                    success=True,
+                    message="Alert statistics retrieved successfully (no alerts table)",
+                    data={
+                        "total": 0,
+                        "by_status": {},
+                        "by_level": {},
+                        "recent_24h": 0
+                    }
+                )
+            
+            # Get alert counts by status
+            status_query = text("""
+                SELECT 
+                    status,
+                    COUNT(*) as count,
+                    COUNT(CASE WHEN created_at >= NOW() - INTERVAL '24 hours' THEN 1 END) as recent_count
+                FROM alerts 
+                GROUP BY status
+                ORDER BY status
+            """)
+            
+            # Get alert counts by level
+            level_query = text("""
+                SELECT 
+                    level,
+                    COUNT(*) as count
+                FROM alerts 
+                GROUP BY level
+                ORDER BY level
+            """)
+            
+            status_result = await session.execute(status_query)
+            level_result = await session.execute(level_query)
+            
+            stats = {
+                "total": total_alerts,
+                "by_status": {},
+                "by_level": {},
+                "recent_24h": 0
+            }
+            
+            # Process status results
+            for row in status_result:
+                stats["by_status"][row.status] = row.count
+                stats["recent_24h"] += row.recent_count
+            
+            # Process level results
+            for row in level_result:
+                stats["by_level"][row.level] = row.count
+        
+        return APIResponse(
+            success=True,
+            message="Alert statistics retrieved successfully",
+            data=stats
+        )
+    except Exception as e:
+        logger.error(f"Failed to get alert stats: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get alert stats")
+
+
+@app.post("/api/v1/alerts/{alert_id}/acknowledge")
+async def acknowledge_alert(
+    alert_id: str,
+    user=Depends(authenticate_user)
+):
+    """Acknowledge an alert"""
+    
+    try:
+        db_manager = await get_database_manager()
+        
+        async with db_manager.get_session() as session:
+            query = text("""
+                UPDATE alerts 
+                SET status = 'acknowledged', 
+                    updated_at = NOW()
+                WHERE id = :alert_id
+                RETURNING id
+            """)
+            
+            result = await session.execute(query, {"alert_id": alert_id})
+            await session.commit()
+            
+            if not result.fetchone():
+                raise HTTPException(status_code=404, detail="Alert not found")
+        
+        return APIResponse(
+            success=True,
+            message="Alert acknowledged successfully"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to acknowledge alert: {e}")
+        raise HTTPException(status_code=500, detail="Failed to acknowledge alert")
+
+
+@app.post("/api/v1/alerts/{alert_id}/resolve")
+async def resolve_alert(
+    alert_id: str,
+    user=Depends(authenticate_user)
+):
+    """Resolve an alert"""
+    
+    try:
+        db_manager = await get_database_manager()
+        
+        async with db_manager.get_session() as session:
+            query = text("""
+                UPDATE alerts 
+                SET status = 'resolved', 
+                    updated_at = NOW()
+                WHERE id = :alert_id
+                RETURNING id
+            """)
+            
+            result = await session.execute(query, {"alert_id": alert_id})
+            await session.commit()
+            
+            if not result.fetchone():
+                raise HTTPException(status_code=404, detail="Alert not found")
+        
+        return APIResponse(
+            success=True,
+            message="Alert resolved successfully"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to resolve alert: {e}")
+        raise HTTPException(status_code=500, detail="Failed to resolve alert")
+
+
 async def main():
     """Main function to run alert engine"""
     try:
@@ -569,5 +892,11 @@ async def main():
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    asyncio.run(main())
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=settings.services.alerting_port,
+        log_level="info",
+        reload=settings.debug
+    )
+

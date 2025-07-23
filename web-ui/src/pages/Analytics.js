@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
-import { TrendingUp, BarChart3, PieChart as PieIcon, RefreshCw, Users, Activity, Source } from 'lucide-react';
+import { TrendingUp, BarChart3, PieChart as PieIcon, RefreshCw, Users, Activity, Globe } from 'lucide-react';
 import axios from 'axios';
 
 const Analytics = () => {
@@ -18,13 +18,21 @@ const Analytics = () => {
       setLoading(true);
       setError(null);
 
-             // Fetch analytics from analytics service (port 8002)
-       const [trendsRes, distributionRes, sourcesRes, typesRes] = await Promise.all([
-         axios.get('http://localhost:8002/api/v1/analytics/event-trends?hours=24&interval_minutes=240'), // 4-hour intervals for 24 hours
-         axios.get('http://localhost:8002/api/v1/analytics/user-distribution'),
-         axios.get('http://localhost:8002/api/v1/analytics/top-sources?limit=10'),
-         axios.get('http://localhost:8002/api/v1/analytics/event-types')
-       ]);
+      // Fetch analytics from analytics service (port 8002)
+      const [trendsRes, distributionRes, sourcesRes, typesRes] = await Promise.all([
+        axios.get('http://localhost:8002/api/v1/analytics/event-trends?hours=24&interval_minutes=240', {
+          headers: { Authorization: 'Bearer demo' }
+        }), // 4-hour intervals for 24 hours
+        axios.get('http://localhost:8002/api/v1/analytics/user-distribution', {
+          headers: { Authorization: 'Bearer demo' }
+        }),
+        axios.get('http://localhost:8002/api/v1/analytics/top-sources?limit=10', {
+          headers: { Authorization: 'Bearer demo' }
+        }),
+        axios.get('http://localhost:8002/api/v1/analytics/event-types', {
+          headers: { Authorization: 'Bearer demo' }
+        })
+      ]);
 
       // Process event trends data
       if (trendsRes.data.success) {
@@ -53,17 +61,8 @@ const Analytics = () => {
       setError('Failed to load analytics data. Please try again.');
       
       // Set fallback data if API fails
-      setEventTrends([
-        { time: '00:00', webClicks: 0, apiRequests: 0, errors: 0, custom: 0, total: 0 },
-        { time: '04:00', webClicks: 0, apiRequests: 0, errors: 0, custom: 0, total: 0 },
-        { time: '08:00', webClicks: 0, apiRequests: 0, errors: 0, custom: 0, total: 0 },
-        { time: '12:00', webClicks: 0, apiRequests: 0, errors: 0, custom: 0, total: 0 },
-        { time: '16:00', webClicks: 0, apiRequests: 0, errors: 0, custom: 0, total: 0 },
-        { time: '20:00', webClicks: 0, apiRequests: 0, errors: 0, custom: 0, total: 0 },
-      ]);
-      setUserDistribution([
-        { name: 'No Data', value: 100, color: '#6b7280', count: 0 }
-      ]);
+      setEventTrends([]);
+      setUserDistribution([]);
       setTopSources([]);
       setEventTypes([]);
 
@@ -75,10 +74,10 @@ const Analytics = () => {
   useEffect(() => {
     fetchAnalyticsData();
     
-    // Auto-refresh every 5 minutes
-    const interval = setInterval(fetchAnalyticsData, 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [fetchAnalyticsData]);
+    // Remove auto-refresh to prevent infinite loops
+    // const interval = setInterval(fetchAnalyticsData, 120 * 1000);
+    // return () => clearInterval(interval);
+  }, []);
 
   // Calculate summary stats
   const totalEvents = eventTrends.reduce((sum, trend) => sum + trend.total, 0);
@@ -141,7 +140,7 @@ const Analytics = () => {
         
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center">
-            <Source className="h-8 w-8 text-purple-600" />
+                            <Globe className="h-8 w-8 text-purple-600" />
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-500">Active Sources</p>
               <p className="text-2xl font-bold text-gray-900">{totalSources}</p>

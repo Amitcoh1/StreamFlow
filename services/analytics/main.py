@@ -1,5 +1,5 @@
 """
-Analytics Pipeline Service - Stream processing and analytics engine
+Analytics Pipeline Service - Stream processing and analytics engine with FastAPI endpoints
 StreamFlow - real-time analytics pipeline
 
  
@@ -7,13 +7,26 @@ StreamFlow - real-time analytics pipeline
 import asyncio
 import logging
 from collections import defaultdict, deque
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Callable, Any
+from typing import Dict, List, Optional, Callable, Any, Union
 from uuid import UUID
 import json
 
+from fastapi import FastAPI, HTTPException, Depends, Query
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
+import uvicorn
+import sqlalchemy as sa
+from sqlalchemy import func, text
+
 from streamflow.shared.config import get_settings
-from streamflow.shared.models import Event, EventType, MetricData, MetricType, ProcessingResult, ProcessingStatus
+from streamflow.shared.models import (
+    Event, EventType, MetricData, MetricType, ProcessingResult, ProcessingStatus,
+    HealthCheck, HealthStatus, APIResponse
+)
 from streamflow.shared.messaging import get_message_broker, get_event_publisher, MessageEnvelope
 from streamflow.shared.database import get_database_manager
 
@@ -21,6 +34,7 @@ logger = logging.getLogger(__name__)
 
 # Global state
 settings = get_settings()
+security = HTTPBearer()
 
 
 class TimeWindow:
@@ -128,7 +142,6 @@ class StreamProcessor:
     
     async def _evaluate_condition(self, condition: str, event: Event) -> bool:
         """Evaluate rule condition"""
-        # Simple condition evaluation (in production, use a proper expression parser)
         try:
             # Create evaluation context
             context = {
@@ -199,7 +212,7 @@ class StreamProcessor:
             )
             
             publisher = await get_event_publisher()
-            await publisher.publish_metric(metric.dict())
+            await publisher.publish_metric(metric.model_dump())
             
         except Exception as e:
             logger.error(f"Metric emission failed: {e}")
@@ -362,8 +375,348 @@ class AnalyticsService:
 analytics_service = AnalyticsService()
 
 
-async def main():
-    """Main function to run analytics service"""
+async def authenticate_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Authenticate user"""
+    if not credentials.credentials:
+        raise HTTPException(status_code=401, detail="Invalid authentication credentials")
+    return {"user_id": "authenticated_user"}
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan events"""
+    # Startup
+    logger.info("Starting Analytics API Service...")
+    
+    # Initialize database
+    db_manager = await get_database_manager()
+    await db_manager.create_tables()
+    
+    # Start analytics service in background
+    asyncio.create_task(analytics_service.start())
+    
+    logger.info("Analytics API Service started successfully")
+    
+    yield
+    
+    # Shutdown
+    logger.info("Shutting down Analytics API Service...")
+    await analytics_service.stop()
+    await db_manager.close()
+    logger.info("Analytics API Service stopped")
+
+
+# Create FastAPI app
+app = FastAPI(
+    title="StreamFlow Analytics API",
+    description="Real-time analytics and stream processing API",
+    version="0.1.0",
+    lifespan=lifespan
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# Health check endpoints
+@app.get("/health", response_model=HealthCheck)
+async def health_check():
+    """Health check endpoint"""
+    try:
+        # Check database
+        db_manager = await get_database_manager()
+        db_health = await db_manager.health_check()
+        
+        # Check message broker
+        broker = await get_message_broker()
+        broker_health = {"status": "healthy" if broker.is_connected else "unhealthy"}
+        
+        overall_status = HealthStatus.HEALTHY
+        if db_health["status"] != "healthy" or broker_health["status"] != "healthy":
+            overall_status = HealthStatus.UNHEALTHY
+        
+        return HealthCheck(
+            status=overall_status,
+            service="analytics",
+            version="0.1.0",
+            checks={
+                "database": db_health,
+                "message_broker": broker_health,
+                "analytics_service": "running" if analytics_service.is_running else "stopped"
+            }
+        )
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        return HealthCheck(
+            status=HealthStatus.UNHEALTHY,
+            service="analytics",
+            version="0.1.0",
+            checks={"error": str(e)}
+        )
+
+
+@app.get("/ready")
+async def readiness_check():
+    """Readiness check endpoint"""
+    return {"status": "ready", "service": "analytics"}
+
+
+# Analytics endpoints
+@app.get("/api/v1/analytics/event-trends")
+async def get_event_trends(
+    hours: int = Query(default=24, ge=1, le=168),
+    interval_minutes: int = Query(default=60, ge=5, le=1440),
+    user=Depends(authenticate_user)
+):
+    """Get event trends over time with real data from database"""
+    
+    try:
+        db_manager = await get_database_manager()
+        end_time = datetime.utcnow()
+        start_time = end_time - timedelta(hours=hours)
+        
+        # Create time buckets based on interval
+        bucket_size = f"{interval_minutes} minutes"
+        
+        # Query database for event trends
+        async with db_manager.get_session() as session:
+            query = text("""
+                SELECT 
+                    DATE_TRUNC('hour', timestamp) + 
+                    INTERVAL '1 hour' * FLOOR(EXTRACT(minute FROM timestamp) / :interval) AS time_bucket,
+                    COUNT(*) as event_count,
+                    COUNT(DISTINCT user_id) as unique_users
+                FROM events 
+                WHERE timestamp >= :start_time AND timestamp <= :end_time
+                GROUP BY time_bucket
+                ORDER BY time_bucket
+            """)
+            
+            result = await session.execute(query, {
+                "start_time": start_time,
+                "end_time": end_time,
+                "interval": interval_minutes
+            })
+            
+            trends = []
+            for row in result:
+                trends.append({
+                    "time": row.time_bucket.isoformat(),
+                    "events": row.event_count,
+                    "users": row.unique_users
+                })
+        
+        return APIResponse(
+            success=True,
+            message="Event trends retrieved successfully",
+            data=trends
+        )
+    except Exception as e:
+        logger.error(f"Failed to get event trends: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get event trends")
+
+
+@app.get("/api/v1/analytics/user-distribution")
+async def get_user_distribution(user=Depends(authenticate_user)):
+    """Get user distribution by device type from real user-agent data"""
+    
+    try:
+        db_manager = await get_database_manager()
+        
+        async with db_manager.get_session() as session:
+            # Extract device info from user-agent data
+            query = text("""
+                SELECT 
+                    CASE 
+                        WHEN data->>'user_agent' ILIKE '%mobile%' OR data->>'user_agent' ILIKE '%android%' 
+                             OR data->>'user_agent' ILIKE '%iphone%' THEN 'Mobile'
+                        WHEN data->>'user_agent' ILIKE '%tablet%' OR data->>'user_agent' ILIKE '%ipad%' THEN 'Tablet'
+                        WHEN data->>'user_agent' ILIKE '%bot%' OR data->>'user_agent' ILIKE '%crawler%' THEN 'Bot'
+                        ELSE 'Desktop'
+                    END as device_type,
+                    COUNT(DISTINCT user_id) as user_count,
+                    COUNT(*) as event_count
+                FROM events 
+                WHERE data->>'user_agent' IS NOT NULL
+                    AND timestamp >= NOW() - INTERVAL '7 days'
+                GROUP BY device_type
+                ORDER BY user_count DESC
+            """)
+            
+            result = await session.execute(query)
+            
+            distribution = []
+            total_users = 0
+            
+            for row in result:
+                distribution.append({
+                    "name": row.device_type,
+                    "users": row.user_count,
+                    "events": row.event_count
+                })
+                total_users += row.user_count
+            
+            # Calculate percentages
+            for item in distribution:
+                item["percentage"] = round((item["users"] / total_users * 100), 1) if total_users > 0 else 0
+        
+        return APIResponse(
+            success=True,
+            message="User distribution retrieved successfully",
+            data=distribution
+        )
+    except Exception as e:
+        logger.error(f"Failed to get user distribution: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get user distribution")
+
+
+@app.get("/api/v1/analytics/top-sources")
+async def get_top_sources(
+    limit: int = Query(default=10, ge=1, le=50),
+    user=Depends(authenticate_user)
+):
+    """Get top event sources with user counts and activity metrics"""
+    
+    try:
+        db_manager = await get_database_manager()
+        
+        async with db_manager.get_session() as session:
+            query = text("""
+                SELECT 
+                    source,
+                    COUNT(*) as event_count,
+                    COUNT(DISTINCT user_id) as unique_users,
+                    AVG(EXTRACT(epoch FROM (NOW() - timestamp))) as avg_age_seconds,
+                    MAX(timestamp) as last_seen
+                FROM events 
+                WHERE timestamp >= NOW() - INTERVAL '24 hours'
+                GROUP BY source
+                ORDER BY event_count DESC
+                LIMIT :limit
+            """)
+            
+            result = await session.execute(query, {"limit": limit})
+            
+            sources = []
+            for row in result:
+                sources.append({
+                    "source": row.source,
+                    "event_count": row.event_count,
+                    "unique_users": row.unique_users,
+                    "avg_age_hours": round(row.avg_age_seconds / 3600, 1) if row.avg_age_seconds else 0,
+                    "last_seen": row.last_seen.isoformat() if row.last_seen else None
+                })
+        
+        return APIResponse(
+            success=True,
+            message="Top sources retrieved successfully",
+            data=sources
+        )
+    except Exception as e:
+        logger.error(f"Failed to get top sources: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get top sources")
+
+
+@app.get("/api/v1/analytics/event-types")
+async def get_event_types(user=Depends(authenticate_user)):
+    """Get event type distribution with real data"""
+    
+    try:
+        db_manager = await get_database_manager()
+        
+        async with db_manager.get_session() as session:
+            query = text("""
+                SELECT 
+                    type,
+                    COUNT(*) as count,
+                    COUNT(DISTINCT user_id) as unique_users,
+                    COUNT(DISTINCT source) as unique_sources,
+                    AVG(
+                        CASE 
+                            WHEN data->>'processing_time' IS NOT NULL 
+                            THEN (data->>'processing_time')::float 
+                            ELSE NULL 
+                        END
+                    ) as avg_processing_time
+                FROM events 
+                WHERE timestamp >= NOW() - INTERVAL '24 hours'
+                GROUP BY type
+                ORDER BY count DESC
+            """)
+            
+            result = await session.execute(query)
+            
+            event_types = []
+            total_events = 0
+            
+            for row in result:
+                event_types.append({
+                    "name": row.type,
+                    "count": row.count,
+                    "unique_users": row.unique_users,
+                    "unique_sources": row.unique_sources,
+                    "avg_processing_time": round(row.avg_processing_time, 3) if row.avg_processing_time else None
+                })
+                total_events += row.count
+            
+            # Calculate percentages
+            for item in event_types:
+                item["percentage"] = round((item["count"] / total_events * 100), 1) if total_events > 0 else 0
+        
+        return APIResponse(
+            success=True,
+            message="Event types retrieved successfully",
+            data=event_types
+        )
+    except Exception as e:
+        logger.error(f"Failed to get event types: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get event types")
+
+
+# Service metrics endpoints
+@app.get("/api/v1/analytics/metrics")
+async def get_service_metrics(user=Depends(authenticate_user)):
+    """Get analytics service metrics"""
+    try:
+        metrics = await analytics_service.get_metrics()
+        return APIResponse(
+            success=True,
+            message="Service metrics retrieved successfully",
+            data=metrics
+        )
+    except Exception as e:
+        logger.error(f"Failed to get service metrics: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get service metrics")
+
+
+@app.get("/api/v1/analytics/windows/{window_name}")
+async def get_window_data(
+    window_name: str,
+    user=Depends(authenticate_user)
+):
+    """Get data from specific processing window"""
+    try:
+        data = await analytics_service.get_window_data(window_name)
+        return APIResponse(
+            success=True,
+            message=f"Window data retrieved for {window_name}",
+            data=data
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to get window data: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get window data")
+
+
+async def run_analytics_processing():
+    """Run analytics processing in background"""
     try:
         await analytics_service.start()
         
@@ -374,11 +727,16 @@ async def main():
     except KeyboardInterrupt:
         logger.info("Received shutdown signal")
     except Exception as e:
-        logger.error(f"Service error: {e}")
+        logger.error(f"Analytics processing error: {e}")
     finally:
         await analytics_service.stop()
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    asyncio.run(main())
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=settings.services.analytics_port,
+        log_level="info",
+        reload=settings.debug
+    )

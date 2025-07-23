@@ -73,7 +73,7 @@ services:
       - DATABASE_URL=postgresql+asyncpg://streamflow:streamflow123@postgres:5432/streamflow
       - REDIS_URL=redis://redis:6379
       - JWT_SECRET_KEY=development-secret-key-change-in-production
-      - CORS_ORIGINS="http://localhost:3000,http://localhost:8080"
+      - CORS_ORIGINS="http://localhost:3000,http://localhost:3001,http://localhost:8080"
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -92,13 +92,15 @@ services:
       context: .
       dockerfile: ./docker/analytics/Dockerfile
     container_name: streamflow-analytics
+    ports:
+      - "8002:8002"
     environment:
       - ENVIRONMENT=development
       - RABBITMQ_URL=amqp://admin:admin123@rabbitmq:5672/
       - DATABASE_URL=postgresql+asyncpg://streamflow:streamflow123@postgres:5432/streamflow
       - REDIS_URL=redis://redis:6379
       - JWT_SECRET_KEY=development-secret-key-change-in-production
-      - CORS_ORIGINS="http://localhost:3000,http://localhost:8080"
+      - CORS_ORIGINS="http://localhost:3000,http://localhost:3001,http://localhost:8080"
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -117,13 +119,15 @@ services:
       context: .
       dockerfile: ./docker/alerting/Dockerfile
     container_name: streamflow-alerting
+    ports:
+      - "8003:8003"
     environment:
       - ENVIRONMENT=development
       - RABBITMQ_URL=amqp://admin:admin123@rabbitmq:5672/
       - DATABASE_URL=postgresql+asyncpg://streamflow:streamflow123@postgres:5432/streamflow
       - REDIS_URL=redis://redis:6379
       - JWT_SECRET_KEY=development-secret-key-change-in-production
-      - CORS_ORIGINS="http://localhost:3000,http://localhost:8080"
+      - CORS_ORIGINS="http://localhost:3000,http://localhost:3001,http://localhost:8080"
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -150,7 +154,7 @@ services:
       - DATABASE_URL=postgresql+asyncpg://streamflow:streamflow123@postgres:5432/streamflow
       - REDIS_URL=redis://redis:6379
       - JWT_SECRET_KEY=development-secret-key-change-in-production
-      - CORS_ORIGINS="http://localhost:3000,http://localhost:8080"
+      - CORS_ORIGINS="http://localhost:3000,http://localhost:3001,http://localhost:8080"
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -183,7 +187,7 @@ services:
       - DATABASE_URL=postgresql+asyncpg://streamflow:streamflow123@postgres:5432/streamflow
       - REDIS_URL=redis://redis:6379
       - JWT_SECRET_KEY=development-secret-key-change-in-production
-      - CORS_ORIGINS="http://localhost:3000,http://localhost:8080"
+      - CORS_ORIGINS="http://localhost:3000,http://localhost:3001,http://localhost:8080"
     depends_on:
       rabbitmq:
         condition: service_healthy

@@ -53,4 +53,4 @@ USER streamflow
 ENV PATH=/home/streamflow/.local/bin:$PATH
 
 # Run the application
-CMD ["python", "-m", "streamflow.services.analytics.main"]
+CMD ["uvicorn", "streamflow.services.analytics.main:app", "--host", "0.0.0.0", "--port", "8002"]

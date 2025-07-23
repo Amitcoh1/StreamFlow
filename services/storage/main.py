@@ -206,8 +206,9 @@ class StorageService:
                     # Convert to Event objects
                     events = []
                     for row in rows:
-                        event_data = dict(row)
-                        event_data['id'] = UUID(event_data['id'])
+                        # Convert SQLAlchemy row to dictionary properly (SQLAlchemy 2.0 fix)
+                        event_data = dict(row._mapping)
+                        event_data['id'] = UUID(str(event_data['id']))
                         
                         # Fix parameter mapping: event_metadata -> metadata
                         if 'event_metadata' in event_data:
