@@ -1079,3 +1079,52 @@ source ~/.zshrc
 **Perfect for daily Kubernetes workflows with StreamFlow!** ⚡
 
 ---
+
+## 🧩 Kubernetes Mutating Webhook: How It Works & Code Reference
+
+### 🚀 What is a Mutating Admission Webhook?
+A **Kubernetes mutating admission webhook** is a service that intercepts resource creation or update requests and can modify (mutate) the object before it is saved to the cluster. This is used to automatically inject best-practice configuration, enforce standards, or add metadata (like monitoring annotations) to all workloads.
+
+### 🔄 How Does It Work?
+1. **User submits a resource** (e.g., `kubectl apply -f deployment.yaml`).
+2. The **Kubernetes API server** receives the object and sends it to any registered mutating webhooks.
+3. The webhook returns a **JSON patch** describing changes (e.g., add annotations/labels).
+4. The API server **applies the patch** to the object in memory.
+5. The API server **saves the final, mutated object to etcd** (the Kubernetes database).
+6. Controllers and schedulers act on the new, mutated object.
+
+### 🗂️ What Does the Webhook Add?
+When you create a deployment, the webhook automatically injects:
+
+```yaml
+annotations:
+  streamflow.io/health-path: /health
+  streamflow.io/injected-at: <timestamp>
+  streamflow.io/metrics-path: /metrics
+  streamflow.io/metrics-port: "8080"
+  streamflow.io/monitoring: enabled
+  streamflow.io/version: 1.0.0
+labels:
+  streamflow.io/managed: "true"
+  streamflow.io/component: microservice
+```
+
+These are present on both the deployment and the pod template (so every pod gets them too).
+
+### 🧑‍💻 Where in the Code Does the Mutation Happen?
+- **File:** `streamflow/services/webhook/main.py`
+- **Key method:** `create_patches()` in the `StreamFlowWebhook` class
+- **Logic:** Builds a JSON patch to add annotations/labels to the object and its pod template (for Deployments)
+- **Entry point:** `/mutate` FastAPI route receives the AdmissionReview and calls `create_patches()`
+
+### 🧠 How Does Kubernetes Save the Object?
+- The API server receives your object, sends it to the webhook, applies the patch, and **then** saves the final, mutated object to etcd.
+- Only the API server talks to etcd; your webhook just returns a patch.
+- The final object (with all webhook changes) is what’s stored in etcd and seen by all controllers/users.
+
+### 📚 What is This Pattern Used For?
+- **Centralized policy enforcement** (e.g., always add monitoring, security, or compliance fields)
+- **Automatic best practices** (no manual YAML editing needed)
+- **Consistent, cluster-wide configuration**
+
+---
